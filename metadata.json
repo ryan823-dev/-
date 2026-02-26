@@ -1,0 +1,8 @@
+{
+  "name": "出海获客智能体 | Global Growth Agent Engine",
+  "description": "面向工业出海企业的全自动获客智能体：从产品建模、营销驱动到主动获客的全链路 AI 引擎。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
