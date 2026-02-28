@@ -334,7 +334,32 @@ const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: Cl
 };
 
 const App: React.FC = () => {
-  const [activeItem, setActiveItem] = useState<NavItem>(NavItem.StrategicHome);
+  // URL Hash <-> NavItem mapping for persistent navigation
+  const hashToNav: Record<string, NavItem> = {
+    '': NavItem.StrategicHome,
+    'home': NavItem.StrategicHome,
+    'knowledge': NavItem.KnowledgeEngine,
+    'marketing': NavItem.MarketingDrive,
+    'outreach': NavItem.OutreachRadar,
+    'social': NavItem.SocialPresence,
+    'hub': NavItem.PromotionHub,
+  };
+  const navToHash: Record<NavItem, string> = {
+    [NavItem.StrategicHome]: 'home',
+    [NavItem.KnowledgeEngine]: 'knowledge',
+    [NavItem.MarketingDrive]: 'marketing',
+    [NavItem.OutreachRadar]: 'outreach',
+    [NavItem.SocialPresence]: 'social',
+    [NavItem.PromotionHub]: 'hub',
+  };
+
+  // Initialize from URL hash
+  const getNavFromHash = (): NavItem => {
+    const hash = window.location.hash.replace('#', '');
+    return hashToNav[hash] || NavItem.StrategicHome;
+  };
+
+  const [activeItem, setActiveItem] = useState<NavItem>(getNavFromHash);
   const [assets, setAssets] = useState<ContentAsset[]>(MockData.contentAssets);
   const [actions, setActions] = useState<ClientAction[]>(MockData.generateClientActions());
   const [currentRole, setCurrentRole] = useState<UserRole>(ROLES.CEO);
@@ -350,6 +375,23 @@ const App: React.FC = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Sync URL hash when activeItem changes
+  useEffect(() => {
+    const newHash = navToHash[activeItem] || 'home';
+    if (window.location.hash !== `#${newHash}`) {
+      window.history.pushState(null, '', `#${newHash}`);
+    }
+  }, [activeItem]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveItem(getNavFromHash());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleActionComplete = (id: string) => {
