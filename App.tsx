@@ -9,6 +9,9 @@ import ProductModeling from './components/ProductModeling';
 import LeadRuns from './components/LeadRuns';
 import LeadPool from './components/LeadPool';
 import CompanyDetail from './components/CompanyDetail';
+import SocialPresence from './components/SocialPresence';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import { NavItem, ContentAsset, ClientAction, UserRole, RoleType, ReportData } from './types';
 import * as MockData from './lib/mock';
 import { Sparkles, CheckCircle2, AlertCircle, RefreshCw, Send, Terminal, Clock, ChevronDown, User, ShieldCheck, Database, Info, Command, ArrowRightCircle } from 'lucide-react';
@@ -23,6 +26,7 @@ const ROLES: Record<RoleType, UserRole> = {
 const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: ClientAction[], role: UserRole }> = ({ onNavigate, actions, role }) => {
   const [messages, setMessages] = useState<{ role: 'ai' | 'user', content: React.ReactNode }[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
   const report = MockData.getWeeklyReport(MockData.mockReportData);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +38,14 @@ const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: Cl
       return priorityMap[a.priority] - priorityMap[b.priority];
     })
     .slice(0, 3);
+
+  // Fetch real dashboard stats
+  useEffect(() => {
+    fetch('/api/stats/dashboard')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setDashboardStats(data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -93,11 +105,25 @@ const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: Cl
                     {MockData.mockReportData.isDemo && <span className="text-[9px] bg-gold text-white px-2 py-0.5 rounded-full font-bold">示例模式 (v0.2)</span>}
                   </h4>
                   <ul className="grid grid-cols-1 gap-3">
-                    {report.results.map((res, i) => (
-                      <li key={i} className="text-xs text-navy-900 flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-border/30 hover:border-gold/30 transition-all font-medium">
-                        <CheckCircle2 size={16} className="text-gold shrink-0" /> {res}
-                      </li>
-                    ))}
+                    {dashboardStats ? (
+                      <>
+                        <li className="text-xs text-navy-900 flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-border/30 hover:border-gold/30 transition-all font-medium">
+                          <CheckCircle2 size={16} className="text-gold shrink-0" /> 已建模产品 {dashboardStats.products} 个，已执行获客任务 {dashboardStats.runs.total} 次（完成 {dashboardStats.runs.done} 次）
+                        </li>
+                        <li className="text-xs text-navy-900 flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-border/30 hover:border-gold/30 transition-all font-medium">
+                          <CheckCircle2 size={16} className="text-gold shrink-0" /> 已发现潜在客户 {dashboardStats.companies.total} 家（已评分 {dashboardStats.companies.scored} 家，已触达 {dashboardStats.companies.outreached} 家）
+                        </li>
+                        <li className="text-xs text-navy-900 flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-border/30 hover:border-gold/30 transition-all font-medium">
+                          <CheckCircle2 size={16} className="text-gold shrink-0" /> 社交内容已发布 {dashboardStats.social.published} 篇，已排程 {dashboardStats.social.scheduled} 篇，总曝光 {dashboardStats.social.impressions.toLocaleString()}
+                        </li>
+                      </>
+                    ) : (
+                      report.results.map((res, i) => (
+                        <li key={i} className="text-xs text-navy-900 flex items-center gap-3 p-3 bg-white/60 rounded-xl border border-border/30 hover:border-gold/30 transition-all font-medium">
+                          <CheckCircle2 size={16} className="text-gold shrink-0" /> {res}
+                        </li>
+                      ))
+                    )}
                     {MockData.mockReportData.siteMetrics.visits.status !== 'active' && (
                       <li className="text-xs text-slate-400 flex items-center gap-3 p-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                         <Database size={16} className="shrink-0" /> 阅读/下载：待接入官方站点统计 (GA/GSC)
@@ -141,17 +167,33 @@ const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: Cl
     ]);
   }, [role]);
 
-  const handleSend = (text?: string) => {
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const handleSend = async (text?: string) => {
     const q = text || inputValue;
-    if (!q) return;
+    if (!q || isChatLoading) return;
     setMessages(prev => [...prev, { role: 'user', content: q }]);
     setInputValue('');
-    setTimeout(() => {
+    setIsChatLoading(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, role: role.label })
+      });
+
+      if (!res.ok) throw new Error('Chat request failed');
+      const data = await res.json();
+      setMessages(prev => [...prev, { role: 'ai', content: data.reply }]);
+    } catch {
       setMessages(prev => [...prev, { 
         role: 'ai', 
         content: `已确认。根据 ${role.label} 授权，我正在重新扫描 OfferingCard 缺口。建议优先补齐 2 项典型参数以激活线索匹配。` 
       }]);
-    }, 800);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   return (
@@ -321,17 +363,30 @@ const App: React.FC = () => {
     ));
   };
 
+  const handleAssetApprove = (id: string, comment: string) => {
+    setAssets(prev => prev.map(a => 
+      a.id === id ? { ...a, status: '待发布' as const, lastModified: new Date().toLocaleDateString() } : a
+    ));
+  };
+
+  const handleAssetRevise = (id: string, comment: string) => {
+    setAssets(prev => prev.map(a => 
+      a.id === id ? { ...a, status: '已修改' as const, lastModified: new Date().toLocaleDateString() } : a
+    ));
+  };
+
   const renderContent = () => {
     switch (activeItem) {
       case NavItem.StrategicHome: 
         return <StrategicHome onNavigate={setActiveItem} actions={actions} role={currentRole} />;
-      case NavItem.KnowledgeEngine: return <KnowledgeEngine />;
+      case NavItem.KnowledgeEngine: return <KnowledgeEngine onNavigate={setActiveItem} />;
       case NavItem.MarketingDrive: return <MarketingDrive assets={assets} />;
       case NavItem.OutreachRadar:
         return <AIProspecting onSelectCompany={setSelectedCompanyId} />;
       case NavItem.PromotionHub: 
-        return <PromotionHub actions={actions} onNavigate={setActiveItem} onActionComplete={handleActionComplete} />;
+        return <PromotionHub actions={actions} assets={assets} onNavigate={setActiveItem} onActionComplete={handleActionComplete} onAssetApprove={handleAssetApprove} onAssetRevise={handleAssetRevise} />;
       case NavItem.SocialPresence:
+        return <SocialPresence />;
       default:
         return (
           <div className="bg-ivory-surface p-12 rounded-[3rem] border border-border text-center">
@@ -348,62 +403,68 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-ivory text-text">
-      <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-20 bg-ivory-surface border-b border-border px-10 flex items-center justify-between shrink-0 z-20">
-          <div className="flex items-center gap-6 flex-1">
-             <div className="flex items-center gap-1.5 bg-ivory px-6 py-3 rounded-full border border-border shadow-sm group cursor-pointer hover:bg-white transition-colors">
-                <span className="text-[12px] font-bold text-slate-400 uppercase tracking-tighter">当前演示项目</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-[14px] font-bold text-navy-900">
-                    涂豆科技 | TD Robotic Paint System
-                  </span>
-                  <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded-md font-mono border border-gold/20">
-                    tdpaintcell.vertax.top
-                  </span>
-                  <ChevronDown size={14} className="text-gold group-hover:translate-y-0.5 transition-transform" />
-                </div>
-             </div>
-          </div>
-          <div className="flex items-center gap-8">
-             <div className="relative" ref={dropdownRef}>
-                <div onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)} className="flex items-center gap-3 bg-navy-900 p-2 pr-5 rounded-[1.5rem] border border-navy-800 cursor-pointer hover:bg-navy-800 transition-all select-none shadow-2xl shadow-navy-900/10 active:scale-95">
-                   <div className={`w-10 h-10 rounded-xl ${currentRole.color} flex items-center justify-center text-xs font-bold text-navy-900 transition-colors shadow-inner`}>{currentRole.label}</div>
-                   <div className="hidden xl:block">
-                     <p className="text-[11px] font-bold text-white leading-none">{currentRole.description}</p>
-                     <div className="flex items-center gap-1.5 mt-1.5"><ShieldCheck size={12} className="text-gold" /><p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{currentRole.accessLevel}</p></div>
-                   </div>
-                   <ChevronDown size={16} className={`text-slate-500 ml-2 transition-transform duration-300 ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
-                </div>
-                {isRoleDropdownOpen && (
-                  <div className="absolute right-0 mt-4 w-72 bg-white border border-border rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300 z-50">
-                     <div className="px-6 py-5 bg-slate-50 border-b border-border"><p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">切换工作视图维度</p></div>
-                     <div className="p-3">
-                        {Object.values(ROLES).map((role) => (
-                          <button key={role.type} onClick={() => { setCurrentRole(role); setIsRoleDropdownOpen(false); }} className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${currentRole.type === role.type ? 'bg-ivory border-gold/20 shadow-sm' : 'hover:bg-slate-50'}`}>
-                             <div className={`w-11 h-11 rounded-xl ${role.color} flex items-center justify-center text-xs font-bold text-navy-900 shadow-md`}>{role.label}</div>
-                             <div className="text-left"><p className="text-xs font-bold text-navy-900">{role.description}</p><p className="text-[11px] text-slate-500 mt-1">{role.accessLevel}</p></div>
-                             {currentRole.type === role.type && <CheckCircle2 size={18} className="text-gold ml-auto" />}
-                          </button>
-                        ))}
-                     </div>
-                  </div>
-                )}
-             </div>
-          </div>
-        </header>
-        <section className="flex-1 overflow-y-auto p-12 bg-ivory scrollbar-hide">
-          <div className="max-w-7xl mx-auto">{renderContent()}</div>
-        </section>
-        {selectedCompanyId && (
-          <CompanyDetail 
-            companyId={selectedCompanyId} 
-            onClose={() => setSelectedCompanyId(null)} 
-          />
-        )}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <ToastProvider>
+        <div className="flex min-h-screen bg-ivory text-text">
+          <Sidebar activeItem={activeItem} onNavigate={setActiveItem} />
+          <main className="flex-1 flex flex-col h-screen overflow-hidden">
+            <header className="h-20 bg-ivory-surface border-b border-border px-10 flex items-center justify-between shrink-0 z-20">
+              <div className="flex items-center gap-6 flex-1">
+                 <div className="flex items-center gap-1.5 bg-ivory px-6 py-3 rounded-full border border-border shadow-sm group cursor-pointer hover:bg-white transition-colors">
+                    <span className="text-[12px] font-bold text-slate-400 uppercase tracking-tighter">当前演示项目</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[14px] font-bold text-navy-900">
+                        涂豆科技 | TD Robotic Paint System
+                      </span>
+                      <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded-md font-mono border border-gold/20">
+                        tdpaintcell.vertax.top
+                      </span>
+                      <ChevronDown size={14} className="text-gold group-hover:translate-y-0.5 transition-transform" />
+                    </div>
+                 </div>
+              </div>
+              <div className="flex items-center gap-8">
+                 <div className="relative" ref={dropdownRef}>
+                    <div onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)} className="flex items-center gap-3 bg-navy-900 p-2 pr-5 rounded-[1.5rem] border border-navy-800 cursor-pointer hover:bg-navy-800 transition-all select-none shadow-2xl shadow-navy-900/10 active:scale-95">
+                       <div className={`w-10 h-10 rounded-xl ${currentRole.color} flex items-center justify-center text-xs font-bold text-navy-900 transition-colors shadow-inner`}>{currentRole.label}</div>
+                       <div className="hidden xl:block">
+                         <p className="text-[11px] font-bold text-white leading-none">{currentRole.description}</p>
+                         <div className="flex items-center gap-1.5 mt-1.5"><ShieldCheck size={12} className="text-gold" /><p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{currentRole.accessLevel}</p></div>
+                       </div>
+                       <ChevronDown size={16} className={`text-slate-500 ml-2 transition-transform duration-300 ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    {isRoleDropdownOpen && (
+                      <div className="absolute right-0 mt-4 w-72 bg-white border border-border rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300 z-50">
+                         <div className="px-6 py-5 bg-slate-50 border-b border-border"><p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">切换工作视图维度</p></div>
+                         <div className="p-3">
+                            {Object.values(ROLES).map((role) => (
+                              <button key={role.type} onClick={() => { setCurrentRole(role); setIsRoleDropdownOpen(false); }} className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${currentRole.type === role.type ? 'bg-ivory border-gold/20 shadow-sm' : 'hover:bg-slate-50'}`}>
+                                 <div className={`w-11 h-11 rounded-xl ${role.color} flex items-center justify-center text-xs font-bold text-navy-900 shadow-md`}>{role.label}</div>
+                                 <div className="text-left"><p className="text-xs font-bold text-navy-900">{role.description}</p><p className="text-[11px] text-slate-500 mt-1">{role.accessLevel}</p></div>
+                                 {currentRole.type === role.type && <CheckCircle2 size={18} className="text-gold ml-auto" />}
+                              </button>
+                            ))}
+                         </div>
+                      </div>
+                    )}
+                 </div>
+              </div>
+            </header>
+            <section className="flex-1 overflow-y-auto p-12 bg-ivory scrollbar-hide">
+              <ErrorBoundary>
+                <div className="max-w-7xl mx-auto">{renderContent()}</div>
+              </ErrorBoundary>
+            </section>
+            {selectedCompanyId && (
+              <CompanyDetail 
+                companyId={selectedCompanyId} 
+                onClose={() => setSelectedCompanyId(null)} 
+              />
+            )}
+          </main>
+        </div>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 };
 

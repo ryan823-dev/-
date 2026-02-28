@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { NavItem, ClientAction } from '../types';
+import { NavItem, ClientAction, ContentAsset } from '../types';
 import { 
   CheckCircle2, 
   AlertCircle, 
@@ -12,18 +12,47 @@ import {
   Clock,
   ExternalLink,
   ShieldCheck,
-  Zap
+  Zap,
+  FileSearch,
+  BookOpen,
+  MessageSquareQuote,
+  ThumbsUp,
+  RotateCcw,
+  Send,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+
+type TabId = 'overview' | 'review' | 'todo' | 'receipts';
+
+type ReviewVerdict = 'approve' | 'revise' | null;
+
+interface ReviewState {
+  assetId: string;
+  verdict: ReviewVerdict;
+  comment: string;
+  corrections: { field: string; original: string; corrected: string }[];
+  expanded: boolean;
+}
 
 interface PromotionHubProps {
   actions: ClientAction[];
+  assets: ContentAsset[];
   onNavigate: (item: NavItem) => void;
   onActionComplete: (id: string) => void;
+  onAssetApprove: (id: string, comment: string) => void;
+  onAssetRevise: (id: string, comment: string) => void;
 }
 
-const PromotionHub: React.FC<PromotionHubProps> = ({ actions, onNavigate, onActionComplete }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'todo' | 'receipts'>('todo');
+const PromotionHub: React.FC<PromotionHubProps> = ({ actions, assets, onNavigate, onActionComplete, onAssetApprove, onAssetRevise }) => {
+  const [activeTab, setActiveTab] = useState<TabId>('review');
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
+
+  // Assets pending review (待确认 or 草稿 from Marketing Drive, Outreach, etc.)
+  const reviewableAssets = assets.filter(a => a.status === '待确认' || a.status === '草稿');
+  const approvedAssets = assets.filter(a => a.status === '待发布' || a.status === '已发布' || a.status === '已修改');
 
   const pendingActions = actions.filter(a => a.status !== '已完成').sort((a, b) => {
     const priorityMap = { P0: 0, P1: 1, P2: 2 };
@@ -42,10 +71,19 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, onNavigate, onActi
 
   const types = Array.from(new Set(pendingActions.map(a => a.type)));
 
+  // Valid NavItem values for safe navigation
+  const validNavItems = Object.values(NavItem);
+
   const handleCTAClick = (action: ClientAction) => {
-    // Spec: Deep link string parsing (basic mock logic)
-    const route = action.ctaRoute.split('?')[0] as NavItem;
-    onNavigate(route);
+    // Spec: Deep link string parsing with validation
+    const routePath = action.ctaRoute.split('?')[0];
+    if (validNavItems.includes(routePath as NavItem)) {
+      onNavigate(routePath as NavItem);
+    } else {
+      // Default to PromotionHub if route is invalid
+      console.warn(`Invalid route: ${routePath}, defaulting to PromotionHub`);
+      onNavigate(NavItem.PromotionHub);
+    }
   };
 
   const getPriorityColor = (p: string) => {
@@ -64,6 +102,50 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, onNavigate, onActi
       default: return 'bg-slate-100 text-slate-700';
     }
   };
+
+  const getReviewState = (assetId: string): ReviewState => {
+    return reviewStates[assetId] || { assetId, verdict: null, comment: '', corrections: [], expanded: false };
+  };
+
+  const updateReviewState = (assetId: string, patch: Partial<ReviewState>) => {
+    setReviewStates(prev => ({
+      ...prev,
+      [assetId]: { ...getReviewState(assetId), ...patch }
+    }));
+  };
+
+  const handleSubmitReview = (asset: ContentAsset) => {
+    const state = getReviewState(asset.id);
+    if (state.verdict === 'approve') {
+      onAssetApprove(asset.id, state.comment);
+    } else if (state.verdict === 'revise') {
+      onAssetRevise(asset.id, state.comment);
+    }
+    // Clear review state after submit
+    setReviewStates(prev => {
+      const next = { ...prev };
+      delete next[asset.id];
+      return next;
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case '待确认': return 'text-amber-700 bg-amber-50 border-amber-200';
+      case '草稿': return 'text-slate-600 bg-slate-50 border-slate-200';
+      case '已修改': return 'text-blue-700 bg-blue-50 border-blue-200';
+      case '待发布': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+      case '已发布': return 'text-emerald-800 bg-emerald-100 border-emerald-300';
+      default: return 'text-slate-500 bg-slate-50 border-slate-200';
+    }
+  };
+
+  const tabs: { id: TabId; label: string; icon: React.FC<{ size?: number; className?: string }>; count?: number }[] = [
+    { id: 'overview', label: '推进总览', icon: LayoutDashboard },
+    { id: 'review', label: '内容审核', icon: FileSearch, count: reviewableAssets.length },
+    { id: 'todo', label: '待办推进', icon: ListTodo, count: stats.total },
+    { id: 'receipts', label: '执行回执', icon: History, count: stats.completed },
+  ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -86,14 +168,10 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, onNavigate, onActi
       </div>
 
       <div className="flex border-b border-border gap-10">
-        {[
-          { id: 'overview', label: '推进总览', icon: LayoutDashboard },
-          { id: 'todo', label: '待办推进', icon: ListTodo, count: stats.total },
-          { id: 'receipts', label: '执行回执', icon: History, count: stats.completed },
-        ].map((tab) => (
+        {tabs.map((tab) => (
           <button 
             key={tab.id} 
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`pb-4 text-sm font-bold transition-all relative flex items-center gap-2 ${
               activeTab === tab.id ? 'text-navy-900' : 'text-slate-400 hover:text-navy-800'
             }`}
@@ -113,30 +191,259 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, onNavigate, onActi
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
            <div className="bg-white p-8 rounded-[2.5rem] border border-border custom-shadow space-y-4">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">P0 阻塞事项</p>
               <p className="text-5xl font-bold text-red-500 font-mono">{stats.p0}</p>
-              <p className="text-xs text-slate-500 font-medium">当前需立即拍板以防止业务停滞</p>
+              <p className="text-xs text-slate-500 font-medium">需立即拍板以防业务停滞</p>
+           </div>
+           <div className="bg-white p-8 rounded-[2.5rem] border border-border custom-shadow space-y-4">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">待审核内容</p>
+              <p className="text-5xl font-bold text-amber-500 font-mono">{reviewableAssets.length}</p>
+              <p className="text-xs text-slate-500 font-medium">AI 生成内容等待人工确认</p>
            </div>
            <div className="bg-white p-8 rounded-[2.5rem] border border-border custom-shadow space-y-4">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">待处理推进</p>
               <p className="text-5xl font-bold text-navy-900 font-mono">{stats.total}</p>
-              <p className="text-xs text-slate-500 font-medium">覆盖资料、内容、授权及方向</p>
+              <p className="text-xs text-slate-500 font-medium">资料、授权及方向决策</p>
            </div>
            <div className="bg-navy-900 p-8 rounded-[2.5rem] text-white custom-shadow space-y-6 relative overflow-hidden">
               <Zap size={48} className="absolute -right-4 -bottom-4 text-gold/10 rotate-12" />
               <div className="space-y-1">
                 <p className="text-[11px] font-bold text-gold uppercase tracking-[0.2em]">执行官建议</p>
-                <p className="text-xs text-slate-300 leading-relaxed font-medium">优先补齐节拍参数，这将激活欧洲市场扫街线索的高质量匹配逻辑。</p>
+                <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                  {reviewableAssets.length > 0
+                    ? `${reviewableAssets.length} 份内容待审核，确认后即可进入发布流程。`
+                    : '优先补齐节拍参数，这将激活高质量匹配逻辑。'}
+                </p>
               </div>
               <button 
-                onClick={() => setActiveTab('todo')}
+                onClick={() => setActiveTab(reviewableAssets.length > 0 ? 'review' : 'todo')}
                 className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-xs font-bold transition-all border border-white/10"
               >
-                前往处理 P0
+                {reviewableAssets.length > 0 ? '前往审核内容' : '前往处理 P0'}
               </button>
            </div>
+        </div>
+      )}
+
+      {/* ==================== 内容审核 Tab ==================== */}
+      {activeTab === 'review' && (
+        <div className="space-y-6">
+          {reviewableAssets.length > 0 ? (
+            <div className="space-y-6">
+              {/* Review queue summary bar */}
+              <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-2xl px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle size={18} className="text-amber-600" />
+                  <p className="text-sm font-bold text-amber-800">
+                    {reviewableAssets.length} 份 AI 生成内容等待您的审核与确认
+                  </p>
+                </div>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">
+                  确认后进入发布流程 | 修改意见将反馈至 AI 引擎
+                </p>
+              </div>
+
+              {/* Reviewable asset cards */}
+              {reviewableAssets.map((asset) => {
+                const rs = getReviewState(asset.id);
+                const isExpanded = rs.expanded;
+
+                return (
+                  <div key={asset.id} className="bg-white rounded-[2.5rem] border border-border custom-shadow overflow-hidden hover:border-gold/30 transition-all">
+                    {/* Card header - always visible */}
+                    <div className="px-8 py-6 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`text-[10px] font-bold px-3 py-1 rounded-lg border uppercase tracking-widest ${getStatusBadge(asset.status)}`}>
+                            {asset.status}
+                          </span>
+                          <span className="text-[10px] font-bold px-3 py-1 rounded-lg bg-emerald-100 text-emerald-700 uppercase tracking-widest">
+                            营销驱动系统
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 uppercase">
+                            {asset.category}
+                          </span>
+                        </div>
+                        <h4 className="text-lg font-bold text-navy-900">{asset.title}</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {asset.keywords.map(kw => (
+                            <span key={kw} className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded italic">#{kw}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono">{asset.lastModified}</span>
+                        <button
+                          onClick={() => updateReviewState(asset.id, { expanded: !isExpanded })}
+                          className="p-3 rounded-2xl border border-border hover:bg-ivory transition-all"
+                        >
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded content - inline review */}
+                    {isExpanded && (
+                      <div className="border-t border-border animate-in fade-in slide-in-from-top-2 duration-300">
+                        {/* Content body */}
+                        <div className="px-8 py-6 bg-ivory/30">
+                          <div className="flex items-center gap-2 mb-4">
+                            <BookOpen size={14} className="text-gold" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI 生成内容正文</p>
+                          </div>
+                          <div className="bg-white border border-border rounded-2xl p-6 max-h-[400px] overflow-y-auto scrollbar-hide">
+                            <div className="prose prose-sm max-w-none text-navy-900 leading-relaxed font-medium whitespace-pre-wrap">
+                              {asset.draftBody ? (
+                                asset.draftBody.split('\n\n').map((p, i) => {
+                                  const hasPlaceholder = p.includes('【待补齐');
+                                  return (
+                                    <p key={i} className={hasPlaceholder ? "bg-amber-50 p-3 rounded-xl border border-amber-100 mb-4" : "mb-4"}>
+                                      {p.split(/(【待补齐：.*?】)/).map((part, idx) => 
+                                        part.startsWith('【待补齐') 
+                                          ? <span key={idx} className="text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100">{part}</span>
+                                          : part
+                                      )}
+                                    </p>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-slate-400 italic">内容正文为空</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Generation trace */}
+                        {asset.generationTrace && asset.generationTrace.length > 0 && (
+                          <div className="px-8 py-4 bg-ivory/20 border-t border-border/50">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <BookOpen size={12} /> 知识引用追踪
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {asset.generationTrace.flatMap((t: any) => t.refs || []).map((r: any, idx: number) => (
+                                <span key={idx} className="text-[10px] font-bold text-navy-900 bg-white border border-border px-3 py-1.5 rounded-lg shadow-sm">
+                                  {r.fieldLabel} <span className="text-slate-400 mx-1">&larr;</span> <span className="text-gold">{r.cardTitle}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Missing info warnings */}
+                        {asset.missingInfoNeeded && asset.missingInfoNeeded.length > 0 && (
+                          <div className="px-8 py-4 bg-red-50/50 border-t border-red-100">
+                            <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                              <AlertTriangle size={12} /> 内容缺口 ({asset.missingInfoNeeded.length})
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {asset.missingInfoNeeded.map(mi => (
+                                <span key={mi.fieldKey} className="text-[10px] font-bold text-red-700 bg-white border border-red-200 px-3 py-1.5 rounded-lg">
+                                  缺失：{mi.label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Review action panel */}
+                        <div className="px-8 py-6 bg-slate-50 border-t border-border space-y-5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MessageSquareQuote size={14} className="text-gold" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">甲方审核意见</p>
+                          </div>
+
+                          {/* Verdict buttons */}
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => updateReviewState(asset.id, { verdict: rs.verdict === 'approve' ? null : 'approve' })}
+                              className={`flex-1 py-3 rounded-2xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${
+                                rs.verdict === 'approve'
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-200'
+                                  : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <ThumbsUp size={16} /> 确认通过，进入发布
+                            </button>
+                            <button
+                              onClick={() => updateReviewState(asset.id, { verdict: rs.verdict === 'revise' ? null : 'revise' })}
+                              className={`flex-1 py-3 rounded-2xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${
+                                rs.verdict === 'revise'
+                                  ? 'bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-200'
+                                  : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+                              }`}
+                            >
+                              <RotateCcw size={16} /> 需修改，反馈 AI
+                            </button>
+                          </div>
+
+                          {/* Comment area (always visible when a verdict is selected) */}
+                          {rs.verdict && (
+                            <div className="space-y-3 animate-in fade-in duration-200">
+                              <textarea
+                                value={rs.comment}
+                                onChange={(e) => updateReviewState(asset.id, { comment: e.target.value })}
+                                placeholder={rs.verdict === 'approve'
+                                  ? '可选：补充确认备注，如"整体准确，第三段可增加案例"...'
+                                  : '请描述需要修改的内容，AI 将据此重新生成。如"术语统一为喷涂房"、"补充 ROI 数据"...'
+                                }
+                                className="w-full bg-white border border-border rounded-2xl px-5 py-4 text-sm font-medium outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-gold/30 transition-all"
+                              />
+                              <div className="flex justify-end">
+                                <button
+                                  onClick={() => handleSubmitReview(asset)}
+                                  className="bg-navy-900 text-white px-8 py-3 rounded-2xl text-sm font-bold hover:bg-navy-800 transition-all shadow-xl flex items-center gap-2 active:scale-95"
+                                >
+                                  <Send size={16} className="text-gold" />
+                                  {rs.verdict === 'approve' ? '确认定稿' : '提交修改意见'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Already approved assets section */}
+              {approvedAssets.length > 0 && (
+                <div className="pt-6 space-y-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">已审核通过</p>
+                  {approvedAssets.map(asset => (
+                    <div key={asset.id} className="bg-white rounded-2xl border border-border p-5 flex items-center justify-between opacity-70 hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                          <CheckCircle2 size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-navy-900">{asset.title}</h4>
+                          <p className="text-[10px] text-slate-500">{asset.category} | {asset.lastModified}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusBadge(asset.status)}`}>
+                        {asset.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-ivory-surface p-20 rounded-[3rem] border border-dashed border-border text-center">
+              <FileSearch size={48} className="text-emerald-400/30 mx-auto mb-4" />
+              <p className="font-bold text-navy-900">暂无待审核内容</p>
+              <p className="text-sm text-slate-500 mt-2">在营销驱动系统中生成的内容将自动进入此审核队列。</p>
+              <button
+                onClick={() => onNavigate(NavItem.MarketingDrive)}
+                className="mt-6 bg-navy-900 text-white px-8 py-3 rounded-2xl text-xs font-bold hover:bg-navy-800 transition-all shadow-xl inline-flex items-center gap-2"
+              >
+                前往营销驱动生成内容 <ArrowRightCircle size={16} className="text-gold" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

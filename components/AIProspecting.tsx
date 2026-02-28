@@ -5,14 +5,16 @@ import LeadRuns from './LeadRuns';
 import LeadPool from './LeadPool';
 import { Radar, Target, Play, Database } from 'lucide-react';
 
+type TabId = 'icp' | 'runs' | 'pool';
+
 interface AIProspectingProps {
   onSelectCompany: (id: string) => void;
 }
 
 const AIProspecting: React.FC<AIProspectingProps> = ({ onSelectCompany }) => {
-  const [activeTab, setActiveTab] = useState<'icp' | 'runs' | 'pool'>('icp');
+  const [activeTab, setActiveTab] = useState<TabId>('icp');
 
-  const tabs = [
+  const tabs: { id: TabId; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'icp', label: '目标画像 (ICP)', icon: Target },
     { id: 'runs', label: '获客任务中心', icon: Play },
     { id: 'pool', label: '线索公海池', icon: Database },
@@ -31,7 +33,7 @@ const AIProspecting: React.FC<AIProspectingProps> = ({ onSelectCompany }) => {
         {tabs.map((tab) => (
           <button 
             key={tab.id} 
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`pb-4 text-sm font-bold transition-all relative flex items-center gap-2 ${
               activeTab === tab.id ? 'text-navy-900' : 'text-slate-400 hover:text-navy-800'
             }`}

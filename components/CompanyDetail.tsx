@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Company, Contact, Evidence, Research, Scoring, Outreach } from '../types';
-import { X, Globe, Mail, Phone, Linkedin, ShieldCheck, Star, FileText, MessageCircle, Link as LinkIcon, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Company, Contact, Evidence, Research, Scoring, Outreach, TenderMetadata } from '../types';
+import { useToast } from './Toast';
+import { X, Globe, Mail, Phone, Linkedin, ShieldCheck, Star, FileText, MessageCircle, Link as LinkIcon, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 
 interface CompanyDetailProps {
   companyId: string;
@@ -8,20 +9,52 @@ interface CompanyDetailProps {
 }
 
 const CompanyDetail: React.FC<CompanyDetailProps> = ({ companyId, onClose }) => {
+  const toast = useToast();
   const [data, setData] = useState<Company & { 
     contacts: Contact[], 
     research: Research, 
     score: Scoring, 
     outreach: Outreach, 
-    evidence: Evidence[] 
+    evidence: Evidence[],
+    tenderMetadata?: TenderMetadata
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'evidence' | 'research' | 'outreach'>('overview');
+  const [isGeneratingOutreach, setIsGeneratingOutreach] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/companies/${companyId}`)
-      .then(res => res.json())
-      .then(setData);
+    const controller = new AbortController();
+    
+    fetch(`/api/companies/${companyId}`, { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        return res.json();
+      })
+      .then(setData)
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('Failed to fetch company details:', err);
+          setError('加载公司详情失败，请稍后重试');
+        }
+      });
+    
+    return () => controller.abort();
   }, [companyId]);
+
+  if (error) return (
+    <div className="fixed inset-0 bg-navy-900/60 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-[3rem] p-12 text-center max-w-md">
+        <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+        <p className="text-sm font-bold text-navy-900 mb-4">{error}</p>
+        <button 
+          onClick={onClose}
+          className="px-6 py-3 bg-navy-900 text-white rounded-xl text-sm font-bold hover:bg-navy-800 transition-all"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
+  );
 
   if (!data) return (
     <div className="fixed inset-0 bg-navy-900/60 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -152,6 +185,61 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ companyId, onClose }) => 
                     </p>
                   </section>
 
+                  {/* 招投标机会展示 (Tender Opportunity) */}
+                  {data.tenderMetadata && (
+                    <section className="p-6 bg-purple-50 border border-purple-200 rounded-2xl">
+                      <h4 className="text-[11px] font-bold text-purple-700 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                        <FileText size={14} /> 招投标机会 (Procurement Opportunity)
+                      </h4>
+                      <div className="space-y-4 text-sm">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">标的名称</span>
+                          <p className="font-bold text-navy-900 mt-1">{data.tenderMetadata.tenderTitle}</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">平台</span>
+                            <p className="font-medium text-navy-900 mt-1">{data.tenderMetadata.platform}</p>
+                          </div>
+                          {data.tenderMetadata.deadline && (
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">截止日期</span>
+                              <p className="text-red-600 font-bold mt-1">
+                                {new Date(data.tenderMetadata.deadline).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
+                          {data.tenderMetadata.estimatedValue && (
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">预估金额</span>
+                              <p className="text-emerald-600 font-bold mt-1">{data.tenderMetadata.estimatedValue}</p>
+                            </div>
+                          )}
+                        </div>
+                        {data.tenderMetadata.requirements && data.tenderMetadata.requirements.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">资质要求</span>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {data.tenderMetadata.requirements.map((r, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">{r}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {data.tenderMetadata.tenderUrl && (
+                          <a 
+                            href={data.tenderMetadata.tenderUrl} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:underline mt-2"
+                          >
+                            查看完整招标公告 <LinkIcon size={12} />
+                          </a>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
                   <section>
                     <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">二、关键业务信号 (Shadow Signals)</h4>
                     <div className="grid grid-cols-1 gap-4">
@@ -213,39 +301,135 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ companyId, onClose }) => 
 
           {activeTab === 'outreach' && (
             <div className="space-y-8 max-w-4xl mx-auto">
-              <div className="grid grid-cols-1 gap-8">
-                {/* Email A */}
-                <div className="bg-white rounded-[2.5rem] border border-border p-10 custom-shadow">
-                  <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-sm font-bold text-navy-900 flex items-center gap-3">
-                      <Mail size={18} className="text-gold" /> 开发信 A (理性/ROI型)
-                    </h3>
-                    <button className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest">复制正文</button>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-ivory/30 rounded-xl border border-border">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">邮件主题</p>
-                      <p className="text-sm font-bold text-navy-900">{data.outreach?.emailA.subject}</p>
-                    </div>
-                    <div className="p-6 bg-slate-50 rounded-xl border border-border font-mono text-xs leading-relaxed text-navy-900 whitespace-pre-wrap">
-                      {data.outreach?.emailA.body}
-                    </div>
-                  </div>
+              {/* Generate Outreach Button */}
+              {!data.outreach?.emailA && (
+                <div className="bg-ivory/50 border border-dashed border-border rounded-[2.5rem] p-12 text-center">
+                  <Sparkles size={48} className="text-gold/30 mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-navy-900 mb-2">尚未生成触达文案</h3>
+                  <p className="text-sm text-slate-500 mb-6">AI 将根据公司背调数据生成个性化开发信和 WhatsApp 消息</p>
+                  <button 
+                    onClick={async () => {
+                      setIsGeneratingOutreach(true);
+                      try {
+                        const res = await fetch(`/api/companies/${companyId}/outreach/generate`, { method: 'POST' });
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({ error: 'Generation failed' }));
+                          throw new Error(err.details || err.error);
+                        }
+                        const outreach = await res.json();
+                        setData(prev => prev ? { ...prev, outreach: { ...outreach, updatedAt: new Date().toISOString() } } : prev);
+                        toast.success('文案生成完成', '已生成 2 封开发信 + 1 条 WhatsApp 消息');
+                      } catch (err: any) {
+                        toast.error('生成失败', err.message || '请稍后重试');
+                      } finally {
+                        setIsGeneratingOutreach(false);
+                      }
+                    }}
+                    disabled={isGeneratingOutreach}
+                    className="px-8 py-3 bg-navy-900 text-white rounded-2xl text-sm font-bold hover:bg-navy-800 transition-all shadow-xl flex items-center gap-2 mx-auto disabled:opacity-50"
+                  >
+                    {isGeneratingOutreach ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="text-gold" />}
+                    {isGeneratingOutreach ? 'AI 正在生成...' : '由 AI 生成触达文案'}
+                  </button>
                 </div>
+              )}
 
-                {/* WhatsApp */}
-                <div className="bg-emerald-900 rounded-[2.5rem] p-10 text-white shadow-xl">
-                  <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-sm font-bold flex items-center gap-3">
-                      <MessageCircle size={18} className="text-emerald-400" /> WhatsApp 建联短消息
-                    </h3>
-                    <button className="text-[10px] font-bold text-emerald-400 hover:underline uppercase tracking-widest">复制消息</button>
+              {data.outreach?.emailA && (
+                <div className="grid grid-cols-1 gap-8">
+                  {/* Email A */}
+                  <div className="bg-white rounded-[2.5rem] border border-border p-10 custom-shadow">
+                    <div className="flex justify-between items-center mb-8">
+                      <h3 className="text-sm font-bold text-navy-900 flex items-center gap-3">
+                        <Mail size={18} className="text-gold" /> 开发信 A (理性/ROI型)
+                      </h3>
+                      <button 
+                        onClick={() => { navigator.clipboard.writeText(`Subject: ${data.outreach?.emailA.subject}\n\n${data.outreach?.emailA.body}`); toast.success('已复制', '邮件内容已复制到剪贴板'); }}
+                        className="text-[10px] font-bold text-gold hover:underline uppercase tracking-widest"
+                      >
+                        复制正文
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-ivory/30 rounded-xl border border-border">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">邮件主题</p>
+                        <p className="text-sm font-bold text-navy-900">{data.outreach?.emailA.subject}</p>
+                      </div>
+                      <div className="p-6 bg-slate-50 rounded-xl border border-border font-mono text-xs leading-relaxed text-navy-900 whitespace-pre-wrap">
+                        {data.outreach?.emailA.body}
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-6 bg-white/10 rounded-xl border border-white/10 text-sm font-medium leading-relaxed italic">
-                    "{data.outreach?.whatsapp.message}"
+
+                  {/* Email B */}
+                  {data.outreach?.emailB && (
+                    <div className="bg-white rounded-[2.5rem] border border-border p-10 custom-shadow">
+                      <div className="flex justify-between items-center mb-8">
+                        <h3 className="text-sm font-bold text-navy-900 flex items-center gap-3">
+                          <Mail size={18} className="text-blue-500" /> 开发信 B (痛点/信号型)
+                        </h3>
+                        <button 
+                          onClick={() => { navigator.clipboard.writeText(`Subject: ${data.outreach?.emailB?.subject}\n\n${data.outreach?.emailB?.body}`); toast.success('已复制', '邮件内容已复制到剪贴板'); }}
+                          className="text-[10px] font-bold text-blue-500 hover:underline uppercase tracking-widest"
+                        >
+                          复制正文
+                        </button>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-blue-50/30 rounded-xl border border-blue-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">邮件主题</p>
+                          <p className="text-sm font-bold text-navy-900">{data.outreach?.emailB.subject}</p>
+                        </div>
+                        <div className="p-6 bg-slate-50 rounded-xl border border-border font-mono text-xs leading-relaxed text-navy-900 whitespace-pre-wrap">
+                          {data.outreach?.emailB.body}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WhatsApp */}
+                  <div className="bg-emerald-900 rounded-[2.5rem] p-10 text-white shadow-xl">
+                    <div className="flex justify-between items-center mb-8">
+                      <h3 className="text-sm font-bold flex items-center gap-3">
+                        <MessageCircle size={18} className="text-emerald-400" /> WhatsApp 建联短消息
+                      </h3>
+                      <button 
+                        onClick={() => { navigator.clipboard.writeText(data.outreach?.whatsapp?.message || ''); toast.success('已复制', '消息已复制到剪贴板'); }}
+                        className="text-[10px] font-bold text-emerald-400 hover:underline uppercase tracking-widest"
+                      >
+                        复制消息
+                      </button>
+                    </div>
+                    <div className="p-6 bg-white/10 rounded-xl border border-white/10 text-sm font-medium leading-relaxed italic">
+                      "{data.outreach?.whatsapp?.message}"
+                    </div>
+                  </div>
+
+                  {/* Regenerate */}
+                  <div className="text-center">
+                    <button 
+                      onClick={async () => {
+                        setIsGeneratingOutreach(true);
+                        try {
+                          const res = await fetch(`/api/companies/${companyId}/outreach/generate`, { method: 'POST' });
+                          if (!res.ok) throw new Error('Regeneration failed');
+                          const outreach = await res.json();
+                          setData(prev => prev ? { ...prev, outreach: { ...outreach, updatedAt: new Date().toISOString() } } : prev);
+                          toast.success('重新生成完成', '文案已更新');
+                        } catch (err: any) {
+                          toast.error('生成失败', err.message);
+                        } finally {
+                          setIsGeneratingOutreach(false);
+                        }
+                      }}
+                      disabled={isGeneratingOutreach}
+                      className="text-xs font-bold text-slate-500 hover:text-navy-900 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+                    >
+                      {isGeneratingOutreach ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      重新生成全部文案
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

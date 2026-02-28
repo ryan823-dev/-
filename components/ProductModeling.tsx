@@ -1,12 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Product, ICPProfile } from '../types';
+import { useToast } from './Toast';
 import { Sparkles, Save, RefreshCw, ChevronRight, Target, Users, Search, AlertTriangle, Lightbulb, Radar } from 'lucide-react';
 
 const ProductModeling: React.FC = () => {
+  const toast = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [sourceStrategy, setSourceStrategy] = useState<any>(null);
+  const [isGeneratingDeep, setIsGeneratingDeep] = useState(false);
+
+  // Check for ExportStrategy from KnowledgeEngine
+  useEffect(() => {
+    try {
+      const source = localStorage.getItem('vtx_icp_source');
+      if (source) {
+        setSourceStrategy(JSON.parse(source));
+      }
+    } catch (e) {
+      console.log('No source strategy found');
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/products')
@@ -29,11 +45,46 @@ const ProductModeling: React.FC = () => {
       const updated = await res.json();
       setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
       setSelectedProduct(updated);
-      alert('配置已保存');
+      toast.success('保存成功', '产品配置已更新');
     } catch (error) {
       console.error('Save error:', error);
+      toast.error('保存失败', '请稍后重试');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // 基于知识引擎数据生成深度 ICP
+  const handleGenerateDeepICP = async () => {
+    if (!sourceStrategy || !selectedProduct) return;
+    setIsGeneratingDeep(true);
+    try {
+      const res = await fetch('/api/knowledge/research/icp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exportStrategy: sourceStrategy,
+          productName: sourceStrategy.productNameCN || selectedProduct.name
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || errorData.error || '生成失败');
+      }
+      const result = await res.json();
+      const deepIcp = result.data;
+      const updated = { ...selectedProduct, icpProfile: deepIcp };
+      setSelectedProduct(updated);
+      setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updated : p));
+      // 清除 localStorage 中的源数据
+      localStorage.removeItem('vtx_icp_source');
+      setSourceStrategy(null);
+      toast.success('深度 ICP 已生成', '基于出口调研数据生成的客户画像');
+    } catch (error: any) {
+      console.error('Deep ICP Generation error:', error);
+      toast.error('生成深度 ICP 失败', error.message || '请稍后重试');
+    } finally {
+      setIsGeneratingDeep(false);
     }
   };
 
@@ -52,7 +103,7 @@ const ProductModeling: React.FC = () => {
       setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updated : p));
     } catch (error: any) {
       console.error('ICP Generation error:', error);
-      alert(`生成 ICP 失败: ${error.message}`);
+      toast.error('生成 ICP 失败', error.message || '请稍后重试');
     } finally {
       setIsGenerating(false);
     }
@@ -75,6 +126,42 @@ const ProductModeling: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* 来自知识引擎的数据提示 */}
+      {sourceStrategy && (
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white relative overflow-hidden animate-in slide-in-from-top duration-500">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Sparkles size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">检测到出口调研数据</h3>
+                <p className="text-white/80 text-sm">
+                  来自知识引擎的「{sourceStrategy.productNameCN || '产品'}」调研已就绪，可生成深度客户画像
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { localStorage.removeItem('vtx_icp_source'); setSourceStrategy(null); }}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors"
+              >
+                忽略
+              </button>
+              <button
+                onClick={handleGenerateDeepICP}
+                disabled={isGeneratingDeep}
+                className="px-6 py-2 bg-white text-indigo-600 rounded-xl text-sm font-bold hover:bg-white/90 transition-colors flex items-center gap-2 shadow-lg"
+              >
+                {isGeneratingDeep ? <RefreshCw size={16} className="animate-spin" /> : <Target size={16} />}
+                生成深度 ICP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-navy-900">产品建模 & ICP 画像</h2>

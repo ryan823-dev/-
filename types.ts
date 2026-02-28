@@ -80,15 +80,96 @@ export interface ClientAction {
 export interface ContentAsset {
   id: string;
   title: string;
+  slug?: string;
+  body?: string;
+  contentType?: string; // 'landing-page' | 'blog-article' | 'faq-page' | 'case-study' | 'technical-doc'
+  language?: string;
   category: string;
-  status: '草稿' | '待确认' | '已修改' | '待发布' | '已发布';
+  status: '草稿' | '待确认' | '已修改' | '待发布' | '已发布' | 'draft' | 'optimized' | 'published' | 'archived';
   publishUrl?: string;
   knowledgeRefs: string[];
   keywords: string[];
   lastModified: string;
   draftBody?: string;
+  // SEO metadata
+  metaTitle?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
+  focusKeyword?: string;
+  secondaryKeywords?: string[];
+  // SEO score
+  seoScore?: {
+    overall: number;
+    breakdown: {
+      keywordOptimization: number;
+      readability: number;
+      structure: number;
+      internalLinking: number;
+      metaTags: number;
+    };
+    suggestions: string[];
+    lastCalculated?: string;
+  };
+  // Traceability
   generationTrace?: any[];
   missingInfoNeeded?: { fieldKey: string; label: string; cardId: string }[];
+  // Structured data
+  structuredData?: Array<{ type: string; schema: any }>;
+  // Versioning
+  version?: number;
+  contentPlanId?: string;
+  // Publishing
+  publishedChannels?: Array<{ channel: string; url?: string; publishedAt: string }>;
+  socialPosts?: Array<{ platform: string; postId: string; publishedAt: string; url?: string }>;
+  prArticles?: Array<{ articleId: string; distributedAt: string; platforms: string[] }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// SEO Content Hub types
+export interface KeywordClusterFE {
+  id: string;
+  name: string;
+  primaryKeyword: string;
+  relatedKeywords: Array<{
+    keyword: string;
+    searchVolume: 'high' | 'medium' | 'low';
+    competition: 'high' | 'medium' | 'low';
+    searchIntent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+    priority: number;
+  }>;
+  source: 'export-strategy' | 'manual' | 'competitor-analysis';
+  status: 'active' | 'archived';
+  createdAt?: string;
+}
+
+export type ContentPlanContentType = 'landing-page' | 'blog-article' | 'faq-page' | 'case-study' | 'technical-doc';
+
+export interface ContentPlanFE {
+  id: string;
+  keywordClusterId?: string;
+  contentType: ContentPlanContentType;
+  targetKeywords: string[];
+  title: string;
+  scheduledDate?: string;
+  priority: 'P0' | 'P1' | 'P2';
+  status: 'planned' | 'generating' | 'draft' | 'optimizing' | 'ready' | 'published';
+  assignedKnowledgeCards: string[];
+  outline?: string[];
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface DerivedContentFE {
+  id: string;
+  parentContentId: string;
+  format: 'linkedin-post' | 'twitter-thread' | 'email-sequence' | 'ppt-outline' | 'internal-doc' | 'social-summary';
+  content: string | string[];
+  title?: string;
+  metadata?: { characterCount?: number; wordCount?: number; tweetCount?: number; emailCount?: number };
+  status: 'generated' | 'edited' | 'published';
+  publishedTo?: { platform: string; url?: string; publishedAt: string };
+  createdAt?: string;
 }
 
 // Fix: Add missing SEOTask interface to resolve import error in SEOStudio.tsx
@@ -117,6 +198,30 @@ export interface PublisherResult {
   message?: string;
 }
 
+// --- Social Presence Types ---
+
+export type SocialPlatformType = 'linkedin' | 'x' | 'facebook';
+
+export interface PRArticle {
+  id: string;
+  title: string;
+  subtitle?: string;
+  body: string;
+  category: 'news-release' | 'industry-article' | 'case-study';
+  status: 'draft' | 'review' | 'approved' | 'distributed';
+  sourceContentAssetId?: string;
+  distributions: Array<{
+    platform: string;
+    distributedAt: string;
+    distributionUrl?: string;
+    status: 'pending' | 'sent' | 'published' | 'failed';
+  }>;
+  keywords: string[];
+  aboutCompany?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- AI SDR System Types ---
 
 export interface Product {
@@ -143,6 +248,7 @@ export interface ICPProfile {
     google: string[];
     linkedin: string[];
     directories: string[];
+    tender: string[];  // 招投标查询
   };
   signalPack: {
     regulation: string[];
@@ -154,23 +260,76 @@ export interface ICPProfile {
   scenarioPack: string[];
   version: number;
   updatedAt: string;
+  
+  // 深度画像维度（可选，由知识引擎联动生成）
+  companyProfile?: {
+    employeeRange: string;      // "10-50人" / "50-200人"
+    revenueRange: string;       // "$1M-5M" / "$5M-20M"
+    targetRegions: Array<{
+      region: string;
+      priority: 'high' | 'medium' | 'low';
+      reasoning: string;
+    }>;
+  };
+  buyerPersonas?: Array<{
+    title: string;              // "采购经理" / "技术总监"
+    role: 'decision_maker' | 'influencer' | 'user' | 'gatekeeper';
+    concerns: string[];         // 他们关心什么
+    reachChannels: string[];    // 怎么触达他们
+  }>;
+  purchasingBehavior?: {
+    decisionCycle: string;      // "3-6个月"
+    budgetRange: string;        // "$50K-200K/年"
+    purchaseFrequency: string;  // "年度采购" / "项目制"
+    keyFactors: string[];       // 采购决策的关键因素
+  };
+  painPoints?: string[];        // 客户痛点
+  buyingTriggers?: string[];    // 购买触发条件
+  sourceData?: {
+    fromKnowledgeEngine: boolean;
+    exportStrategyId?: string;
+    generatedAt: string;
+  };
 }
 
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled';
+
+// 多国家配置接口
+export interface CountryConfig {
+  countryCode: string;        // 'DE'
+  countryName: string;        // 'Germany'
+  countryNameCN: string;      // '德国'
+  language: string;           // 'German'
+  priority: 'high' | 'medium' | 'low';
+  allocatedQueries: number;   // 分配的查询次数
+  status: 'pending' | 'running' | 'done' | 'skipped';
+  companiesFound: number;     // 该国已发现的公司数
+}
 
 export interface LeadRun {
   id: string;
   productId: string;
   productName: string;
-  country: string;
-  language: string;
+  // 兼容旧数据：单国家字段
+  country?: string;
+  language?: string;
+  // 新增：多国家配置
+  countries?: CountryConfig[];
+  targetCompanyCount?: number;  // 目标公司数（默认30）
+  strategy?: string;
   status: RunStatus;
   progress: {
     discovery: number;
+    enrichment: number;
     contact: number;
     research: number;
     outreach: number;
     total: number;
+    currentStage?: string;
+    totalQueries?: number;
+    completedQueries?: number;
+    currentCountryIndex?: number;  // 当前执行的国家索引
+    currentCountry?: string;       // 当前执行的国家代码
   };
   errorMessage?: string;
   startedAt?: string;
@@ -179,6 +338,16 @@ export interface LeadRun {
 }
 
 export type CompanyStatus = 'discovered' | 'researching' | 'researched' | 'scored' | 'outreached' | 'failed';
+
+export interface TenderMetadata {
+  tenderTitle: string;
+  platform: string;          // "TED", "SAM.gov" 等
+  deadline?: string;         // ISO 日期
+  estimatedValue?: string;   // "€500K - €2M"
+  requirements?: string[];   // ["ISO 9001", "EU supplier"]
+  issuingAuthority: string;  // 发标机构
+  tenderUrl?: string;
+}
 
 export interface Company {
   id: string;
@@ -191,6 +360,7 @@ export interface Company {
   source: string;
   status: CompanyStatus;
   notes?: string;
+  tenderMetadata?: TenderMetadata;  // 招标机会元数据
   createdAt: string;
   updatedAt: string;
   score?: Scoring;
@@ -225,7 +395,7 @@ export interface Evidence {
   pageType: 'home' | 'about' | 'contact' | 'careers' | 'news' | 'linkedin' | 'dir' | 'pdf' | 'other';
   snippet: string;
   extractedFact: string;
-  factType: 'paint_line' | 'expansion' | 'hiring' | 'automation' | 'contact_info' | 'other';
+  factType: 'paint_line' | 'expansion' | 'hiring' | 'automation' | 'contact_info' | 'tender_opportunity' | 'other';
   relevance: number;
   capturedAt: string;
 }
@@ -236,7 +406,8 @@ export enum SignalType {
   EXPANSION = 'expansion',   // 扩产/新建
   AUTOMATION = 'automation', // 自动化升级
   SUPPLY_CHAIN = 'supply_chain', // 供应链变动
-  FACILITY = 'facility'      // 厂房/物理变动
+  FACILITY = 'facility',     // 厂房/物理变动
+  TENDER = 'tender'          // 招投标机会
 }
 
 export enum SignalStrength {

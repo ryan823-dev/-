@@ -19,9 +19,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate }) => {
   const menuItems = [
     { id: NavItem.StrategicHome, label: '出海获客智能体', icon: MessageSquare },
     { id: NavItem.KnowledgeEngine, label: '专业知识引擎', icon: Library },
-    { id: NavItem.MarketingDrive, label: '营销驱动系统', icon: BarChart3 },
     { id: NavItem.OutreachRadar, label: '出海获客雷达', icon: Radar },
-    { id: NavItem.SocialPresence, label: '海外声量中台', icon: Globe },
+    { id: NavItem.MarketingDrive, label: '营销驱动系统', icon: BarChart3 },
+    { id: NavItem.SocialPresence, label: '出海声量枢纽', icon: Globe },
     { id: NavItem.PromotionHub, label: '出海推进中台', icon: RefreshCw },
   ];
 

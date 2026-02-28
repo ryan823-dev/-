@@ -113,13 +113,91 @@ export const generateClientActions = (): ClientAction[] => {
 export const contentAssets: ContentAsset[] = [
   {
     id: 'ca-td-1',
-    title: '2024年喷涂机器人工作站选型手册',
-    category: '选型手册',
+    title: '2024 Robotic Paint Cell Selection Guide',
+    category: 'Selection Guide',
     status: '待确认',
     knowledgeRefs: ['k-td-1', 'k-td-2'],
-    keywords: ['喷涂机器人', '选型指南', '涂豆科技'],
+    keywords: ['paint robot', 'selection guide', 'TD Robotics', 'automated coating'],
     lastModified: '2024-03-24',
-    draftBody: "选择合适的喷涂机器人工作站是实现涂装自动化的第一步...",
+    draftBody: `Selecting the right robotic paint cell is the first step toward achieving coating automation. This guide will help procurement decision-makers quickly match the optimal solution based on three key dimensions: workpiece size, coating process, and capacity requirements.
+
+1. Workpiece Size and Station Selection
+
+TD Robotics offers S/M/L series workstations corresponding to small parts (≤800mm), medium parts (800-2000mm), and large parts (>2000mm). Key considerations include maximum envelope dimensions and weight capacity.
+
+[TO BE FILLED: Typical workpiece size range]
+
+2. Coating Process Matching
+
+Different coating systems have varying requirements for spray parameters. Water-based paint systems demand higher atomization pressure and flow control precision, while powder coating requires coordination with electrostatic high-voltage generators. All TD workstations support rapid color change, completing the full process switch within [TO BE FILLED: Color change time].
+
+3. Capacity and Cycle Time Planning
+
+The core metric for industrial coating lines is single-piece cycle time. The TD M-series workstation achieves [TO BE FILLED: Typical cycle time] per piece under standard conditions, with annual capacity reaching [TO BE FILLED: Annual capacity data].
+
+4. ROI Reference
+
+Based on delivered German customer cases, automated paint cells reduce paint consumption by approximately 40% compared to manual spraying, with labor costs reduced by over 60%. Typical payback period is 18-24 months.`,
+    generationTrace: [
+      { paragraph: 'Workpiece Size and Station Selection', refs: [{ fieldLabel: 'Product Series', fieldKey: 'product_series', cardTitle: 'TD Paint Station OfferingCard' }] },
+      { paragraph: 'ROI Reference', refs: [{ fieldLabel: 'German Customer Case', fieldKey: 'de_case', cardTitle: 'German Autohaus Case ProofCard', sourceName: 'Delivery Report' }] }
+    ],
+    missingInfoNeeded: [
+      { fieldKey: 'cycle_time', label: 'Typical Cycle Time', cardId: 'k-td-1' },
+      { fieldKey: 'color_change_time', label: 'Color Change Time', cardId: 'k-td-1' },
+      { fieldKey: 'workpiece_size', label: 'Typical Workpiece Size Range', cardId: 'k-td-1' },
+      { fieldKey: 'annual_capacity', label: 'Annual Capacity Data', cardId: 'k-td-2' }
+    ]
+  },
+  {
+    id: 'ca-td-2',
+    title: 'Why Automated Paint Cells Are Replacing Manual Spray Booths in Europe',
+    category: 'SEO Blog',
+    status: '待确认',
+    knowledgeRefs: ['k-td-1'],
+    keywords: ['automated painting', 'spray booth replacement', 'European manufacturing', 'Industry 4.0'],
+    lastModified: '2024-03-25',
+    draftBody: `European manufacturers are increasingly moving away from traditional manual spray booths toward fully automated robotic paint cells. This shift is driven by three converging forces: stricter VOC emission regulations, rising labor costs, and the demand for consistent coating quality.
+
+The EU Industrial Emissions Directive (IED) has tightened VOC limits for surface coating operations, making many legacy spray booths non-compliant. Automated paint cells, with their enclosed design and precise overspray control, reduce VOC emissions by up to 35% compared to open manual booths.
+
+Labor economics further accelerate adoption. In Germany alone, skilled spray painters command wages of [TO BE FILLED: German spray painter hourly wage] per hour, and the profession faces a chronic shortage of qualified workers. Robotic paint cells operate 24/7 with minimal supervision.
+
+TD Robotics offers a modular paint cell solution specifically designed for European compliance standards, supporting both waterborne and powder coating processes with [TO BE FILLED: Color change time] color-change capability.`,
+    generationTrace: [
+      { paragraph: 'VOC emission regulations', refs: [{ fieldLabel: 'VOC Compliance Standard', fieldKey: 'voc_standard', cardTitle: 'TD Paint Station OfferingCard' }] }
+    ],
+    missingInfoNeeded: [
+      { fieldKey: 'de_painter_wage', label: 'German Spray Painter Hourly Wage', cardId: 'k-td-1' },
+      { fieldKey: 'color_change_time', label: 'Color Change Time', cardId: 'k-td-1' }
+    ]
+  },
+  {
+    id: 'ca-td-3',
+    title: 'TD Robotics Company Profile - Global Coating Automation Solutions',
+    category: 'Company Profile',
+    status: '草稿',
+    knowledgeRefs: ['k-td-1', 'k-td-2'],
+    keywords: ['TD Robotics', 'company introduction', 'coating automation', 'company profile'],
+    lastModified: '2024-03-23',
+    draftBody: `TD Robotics, founded in 2018, specializes in the R&D and manufacturing of industrial coating automation solutions. Headquartered in China, the company serves markets across Europe, Southeast Asia, and Latin America.
+
+Core Product Lines:
+- S Series Compact Paint Workstation (for small parts)
+- M Series Standard Paint Workstation (general purpose)
+- L Series Large-scale Paint Production Line (for heavy parts / complete vehicles)
+
+Technical Advantages:
+1. Self-developed 6-axis paint robot with repeatability of ±0.05mm
+2. Intelligent trajectory planning system, automatically adapting to different workpiece geometries
+3. Rapid color change system supporting waterborne / solvent-based / powder coatings
+
+Having served [TO BE FILLED: Total customer count] enterprise customers globally, with a cumulative delivery of [TO BE FILLED: Total equipment delivered] automated coating systems.`,
+    generationTrace: [],
+    missingInfoNeeded: [
+      { fieldKey: 'total_customers', label: 'Total Customer Count', cardId: 'k-td-2' },
+      { fieldKey: 'total_deliveries', label: 'Total Equipment Delivered', cardId: 'k-td-2' }
+    ]
   }
 ];
 
