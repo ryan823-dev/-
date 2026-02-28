@@ -17,10 +17,32 @@ import * as MockData from './lib/mock';
 import { Sparkles, CheckCircle2, AlertCircle, RefreshCw, Send, Terminal, Clock, ChevronDown, User, ShieldCheck, Database, Info, Command, ArrowRightCircle } from 'lucide-react';
 
 const ROLES: Record<RoleType, UserRole> = {
-  CEO: { type: 'CEO', label: 'CEO', description: '最高管理层级', accessLevel: 'Gold Tier Access', color: 'bg-gold' },
-  CMO: { type: 'CMO', label: 'CMO', description: '营销决策层级', accessLevel: 'Full Asset Control', color: 'bg-blue-500' },
-  CTO: { type: 'CTO', label: 'CTO', description: '技术管理层级', accessLevel: 'RAG Source Admin', color: 'bg-purple-500' },
-  SALES: { type: 'SALES', label: 'BD', description: '业务执行层级', accessLevel: 'Lead Generation', color: 'bg-emerald-500' },
+  BOSS: { 
+    type: 'BOSS', 
+    label: '决策者', 
+    description: '老板/负责人', 
+    accessLevel: '全局战略视图', 
+    color: 'bg-gold',
+    permissions: {
+      canApprove: true,
+      canUploadDocs: false,
+      canViewReports: true,
+      canExecuteTasks: false,
+    }
+  },
+  STAFF: { 
+    type: 'STAFF', 
+    label: '执行者', 
+    description: '员工/助理', 
+    accessLevel: '任务执行视图', 
+    color: 'bg-blue-500',
+    permissions: {
+      canApprove: false,
+      canUploadDocs: true,
+      canViewReports: false,
+      canExecuteTasks: true,
+    }
+  },
 };
 
 const StrategicHome: React.FC<{ onNavigate: (item: NavItem) => void, actions: ClientAction[], role: UserRole }> = ({ onNavigate, actions, role }) => {
@@ -362,7 +384,7 @@ const App: React.FC = () => {
   const [activeItem, setActiveItem] = useState<NavItem>(getNavFromHash);
   const [assets, setAssets] = useState<ContentAsset[]>(MockData.contentAssets);
   const [actions, setActions] = useState<ClientAction[]>(MockData.generateClientActions());
-  const [currentRole, setCurrentRole] = useState<UserRole>(ROLES.CEO);
+  const [currentRole, setCurrentRole] = useState<UserRole>(ROLES.BOSS);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

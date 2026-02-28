@@ -1579,8 +1579,8 @@ ${assetBody}
         // Mock mode: create a mock account
         const mockAccount = await SocialAccountModel.create({
           platform: 'linkedin',
+          accountHandle: '@mock_linkedin',
           accountName: 'Mock LinkedIn Account',
-          displayName: 'LinkedIn User (Mock)',
           status: 'active',
           accessToken: 'mock_access_token',
           tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
@@ -1588,15 +1588,15 @@ ${assetBody}
         return res.json({
           success: true,
           mock: true,
-          account: { ...mockAccount.toObject(), id: mockAccount._id.toString() }
+          account: { ...mockAccount!.toObject(), id: mockAccount!._id.toString() }
         });
       }
 
       const tokenData = await exchangeLinkedInCode(code as string, config);
       const account = await SocialAccountModel.create({
         platform: 'linkedin',
+        accountHandle: '@linkedin_user',
         accountName: 'LinkedIn Account',
-        displayName: 'LinkedIn User',
         status: 'active',
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
@@ -1606,7 +1606,7 @@ ${assetBody}
       res.json({
         success: true,
         mock: false,
-        account: { ...account.toObject(), id: account._id.toString() }
+        account: { ...account!.toObject(), id: account!._id.toString() }
       });
     } catch (err: any) {
       res.status(500).json({ error: 'LinkedIn OAuth callback failed', details: err.message });

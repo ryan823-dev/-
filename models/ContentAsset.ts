@@ -176,7 +176,7 @@ const ContentAssetSchema = new Schema<IContentAsset>({
 });
 
 // Pre-save hook to generate slug from title
-ContentAssetSchema.pre('save', function(next) {
+ContentAssetSchema.pre('save', function(this: IContentAsset, next: Function) {
   if (this.isModified('title') && !this.slug) {
     this.slug = this.title
       .toLowerCase()

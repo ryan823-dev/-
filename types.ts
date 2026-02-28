@@ -8,7 +8,7 @@ export enum NavItem {
   PromotionHub = 'promotion-hub',
 }
 
-export type RoleType = 'CEO' | 'CMO' | 'CTO' | 'SALES';
+export type RoleType = 'BOSS' | 'STAFF';
 
 export interface UserRole {
   type: RoleType;
@@ -16,6 +16,13 @@ export interface UserRole {
   description: string;
   accessLevel: string;
   color: string;
+  // 角色专属功能权限
+  permissions: {
+    canApprove: boolean;      // 审批内容/决策
+    canUploadDocs: boolean;   // 上传资料
+    canViewReports: boolean;  // 查看汇报
+    canExecuteTasks: boolean; // 执行日常任务
+  };
 }
 
 export interface MetricSource {
