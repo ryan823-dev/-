@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavItem, ClientAction, ContentAsset } from '../types';
 import { 
   CheckCircle2, 
@@ -21,10 +21,30 @@ import {
   Send,
   AlertTriangle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Radio,
+  RefreshCw,
+  ArrowUpRight,
+  Timer,
+  XCircle
 } from 'lucide-react';
 
-type TabId = 'overview' | 'review' | 'todo' | 'receipts';
+type TabId = 'overview' | 'review' | 'todo' | 'receipts' | 'push-tracking';
+
+interface PushRecordFE {
+  _id: string;
+  assetId: { _id: string; title: string; slug?: string } | string;
+  productSlug: string;
+  status: 'pending' | 'confirmed' | 'timeout' | 'failed' | 'escalated';
+  targetUrl?: string;
+  remoteId?: string;
+  pushedAt: string;
+  timeoutAt: string;
+  confirmedAt?: string;
+  escalatedAt?: string;
+  retryCount: number;
+  lastError?: string;
+}
 
 type ReviewVerdict = 'approve' | 'revise' | null;
 
@@ -49,6 +69,39 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, assets, onNavigate
   const [activeTab, setActiveTab] = useState<TabId>('review');
   const [filterType, setFilterType] = useState<string | null>(null);
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
+
+  // Push tracking state
+  const [pushRecords, setPushRecords] = useState<PushRecordFE[]>([]);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushFilter, setPushFilter] = useState<string>('all');
+
+  const fetchPushRecords = useCallback(async () => {
+    setPushLoading(true);
+    try {
+      const params = pushFilter !== 'all' ? `?status=${pushFilter}` : '';
+      const res = await fetch(`/api/push-records${params}`);
+      if (res.ok) setPushRecords(await res.json());
+    } catch { /* silent */ }
+    finally { setPushLoading(false); }
+  }, [pushFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'push-tracking') fetchPushRecords();
+  }, [activeTab, fetchPushRecords]);
+
+  const handlePushConfirm = async (recordId: string) => {
+    try {
+      const res = await fetch(`/api/push-records/${recordId}/confirm`, { method: 'POST' });
+      if (res.ok) fetchPushRecords();
+    } catch { /* silent */ }
+  };
+
+  const handlePushRetry = async (recordId: string) => {
+    try {
+      const res = await fetch(`/api/push-records/${recordId}/retry`, { method: 'POST' });
+      if (res.ok) fetchPushRecords();
+    } catch { /* silent */ }
+  };
 
   // Assets pending review (待确认 or 草稿 from Marketing Drive, Outreach, etc.)
   const reviewableAssets = assets.filter(a => a.status === '待确认' || a.status === '草稿');
@@ -140,9 +193,12 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, assets, onNavigate
     }
   };
 
+  const pushPendingCount = pushRecords.filter(r => r.status === 'pending' || r.status === 'timeout').length;
+
   const tabs: { id: TabId; label: string; icon: React.FC<{ size?: number; className?: string }>; count?: number }[] = [
     { id: 'overview', label: '推进总览', icon: LayoutDashboard },
     { id: 'review', label: '内容审核', icon: FileSearch, count: reviewableAssets.length },
+    { id: 'push-tracking', label: '推送追踪', icon: Radio, count: pushPendingCount || undefined },
     { id: 'todo', label: '待办推进', icon: ListTodo, count: stats.total },
     { id: 'receipts', label: '执行回执', icon: History, count: stats.completed },
   ];
@@ -441,6 +497,149 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, assets, onNavigate
                 className="mt-6 bg-navy-900 text-white px-8 py-3 rounded-2xl text-xs font-bold hover:bg-navy-800 transition-all shadow-xl inline-flex items-center gap-2"
               >
                 前往营销驱动生成内容 <ArrowRightCircle size={16} className="text-gold" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== 推送追踪 Tab ==================== */}
+      {activeTab === 'push-tracking' && (
+        <div className="space-y-6">
+          {/* Filter bar + refresh */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              {[
+                { key: 'all', label: '全部' },
+                { key: 'pending', label: '等待审核' },
+                { key: 'timeout', label: '已超时' },
+                { key: 'confirmed', label: '已确认' },
+                { key: 'failed', label: '推送失败' },
+                { key: 'escalated', label: '已升级' },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setPushFilter(f.key)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold border whitespace-nowrap transition-all ${
+                    pushFilter === f.key ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-slate-500 border-border hover:border-slate-300'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={fetchPushRecords}
+              disabled={pushLoading}
+              className="p-2.5 rounded-xl border border-border hover:bg-ivory transition-all disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={pushLoading ? 'animate-spin text-gold' : 'text-slate-500'} />
+            </button>
+          </div>
+
+          {/* Push records list */}
+          {pushLoading && pushRecords.length === 0 ? (
+            <div className="text-center p-20 text-slate-400">
+              <RefreshCw size={24} className="animate-spin mx-auto mb-3 text-gold" />
+              <p className="text-sm font-medium">加载推送记录...</p>
+            </div>
+          ) : pushRecords.length > 0 ? (
+            <div className="space-y-4">
+              {pushRecords.map(record => {
+                const assetTitle = typeof record.assetId === 'object' ? record.assetId.title : record.assetId;
+                const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+                  pending: { color: 'text-amber-700 bg-amber-50 border-amber-200', icon: <Timer size={14} className="text-amber-600" />, label: '等待客户审核' },
+                  confirmed: { color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: <CheckCircle2 size={14} className="text-emerald-600" />, label: '已确认发布' },
+                  timeout: { color: 'text-red-700 bg-red-50 border-red-200', icon: <AlertTriangle size={14} className="text-red-600" />, label: '已超时 · 待升级' },
+                  failed: { color: 'text-slate-700 bg-slate-50 border-slate-300', icon: <XCircle size={14} className="text-slate-500" />, label: '推送失败' },
+                  escalated: { color: 'text-purple-700 bg-purple-50 border-purple-200', icon: <ArrowUpRight size={14} className="text-purple-600" />, label: '已升级至 Tower' },
+                };
+                const sc = statusConfig[record.status] || statusConfig.pending;
+                const timeoutDate = new Date(record.timeoutAt);
+                const pushedDate = new Date(record.pushedAt);
+                const now = new Date();
+                const hoursLeft = Math.max(0, Math.round((timeoutDate.getTime() - now.getTime()) / 3600000));
+
+                return (
+                  <div key={record._id} className={`bg-white rounded-[2rem] border p-6 custom-shadow transition-all hover:border-gold/30 ${
+                    record.status === 'timeout' ? 'border-l-[5px] border-l-red-400' :
+                    record.status === 'failed' ? 'border-l-[5px] border-l-slate-400' :
+                    'border-border'
+                  }`}>
+                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`text-[10px] font-bold px-3 py-1 rounded-lg border uppercase tracking-widest flex items-center gap-1.5 ${sc.color}`}>
+                            {sc.icon} {sc.label}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
+                            {record.productSlug}
+                          </span>
+                          {record.retryCount > 0 && (
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                              重试 ×{record.retryCount}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-base font-bold text-navy-900">{assetTitle}</h4>
+                        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 font-medium">
+                          <span className="flex items-center gap-1"><Send size={11} className="text-gold" /> 推送于 {pushedDate.toLocaleString('zh-CN')}</span>
+                          {record.status === 'pending' && (
+                            <span className="flex items-center gap-1">
+                              <Clock size={11} className={hoursLeft <= 4 ? 'text-red-500' : 'text-slate-400'} />
+                              {hoursLeft > 0 ? `${hoursLeft}h 后超时` : '即将超时'}
+                            </span>
+                          )}
+                          {record.confirmedAt && (
+                            <span className="flex items-center gap-1"><CheckCircle2 size={11} className="text-emerald-500" /> 确认于 {new Date(record.confirmedAt).toLocaleString('zh-CN')}</span>
+                          )}
+                          {record.targetUrl && (
+                            <a href={record.targetUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-navy-900 hover:text-gold transition-colors">
+                              <ExternalLink size={11} /> 查看目标页
+                            </a>
+                          )}
+                        </div>
+                        {record.lastError && (
+                          <p className="text-[11px] text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg font-mono">
+                            {record.lastError}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="shrink-0 flex gap-2">
+                        {record.status === 'pending' && (
+                          <button
+                            onClick={() => handlePushConfirm(record._id)}
+                            className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 size={14} /> 手动确认
+                          </button>
+                        )}
+                        {(record.status === 'failed' || record.status === 'timeout') && (
+                          <button
+                            onClick={() => handlePushRetry(record._id)}
+                            className="px-5 py-2.5 bg-navy-900 text-white rounded-xl text-xs font-bold hover:bg-navy-800 transition-all flex items-center gap-1.5"
+                          >
+                            <RotateCcw size={14} /> 重新推送
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-ivory-surface p-20 rounded-[3rem] border border-dashed border-border text-center">
+              <Radio size={48} className="text-slate-300 mx-auto mb-4" />
+              <p className="font-bold text-navy-900">暂无推送记录</p>
+              <p className="text-sm text-slate-500 mt-2">在营销驱动系统中发布内容至客户独立站后，推送记录将在此处跟踪。</p>
+              <button
+                onClick={() => onNavigate(NavItem.MarketingDrive)}
+                className="mt-6 bg-navy-900 text-white px-8 py-3 rounded-2xl text-xs font-bold hover:bg-navy-800 transition-all shadow-xl inline-flex items-center gap-2"
+              >
+                前往营销驱动 <ArrowRightCircle size={16} className="text-gold" />
               </button>
             </div>
           )}

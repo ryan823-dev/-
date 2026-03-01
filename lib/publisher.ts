@@ -1,5 +1,6 @@
-
 import { ContentAsset, PublisherResult } from '../types';
+import { ClientSiteConfig, IClientSiteConfig } from '../models/ClientSiteConfig';
+import { mapContentAssetToPayload } from './push-pipeline/field-mapper';
 
 export interface PublisherAdapter {
   publishContent(asset: ContentAsset): Promise<PublisherResult>;
@@ -17,28 +18,70 @@ export class MockPublisherAdapter implements PublisherAdapter {
   }
 }
 
-/**
- * SupabasePublisherAdapter
- * Ready for future integration with Tudou Technology's production database.
- */
 export class SupabasePublisherAdapter implements PublisherAdapter {
-  async publishContent(asset: ContentAsset): Promise<PublisherResult> {
-    // Note: In production, these should be handled via a secure API endpoint 
-    // to protect the Service Role Key.
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  private config: IClientSiteConfig;
 
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return { status: 'error', message: 'Supabase configuration missing' };
+  constructor(config: IClientSiteConfig) {
+    this.config = config;
+  }
+
+  async publishContent(asset: ContentAsset): Promise<PublisherResult> {
+    const { supabaseConfig } = this.config;
+
+    if (!supabaseConfig?.projectUrl || !supabaseConfig?.pushSecret) {
+      return { status: 'error', message: 'Supabase configuration missing in ClientSiteConfig' };
     }
 
+    const functionUrl = `${supabaseConfig.projectUrl}/functions/v1/${supabaseConfig.functionName || 'receive-content-push'}`;
+    const payload = mapContentAssetToPayload(asset);
+
     try {
-      // Logic for writing to 'vertax_content_assets' table would go here
-      // For now, this acts as a skeleton.
-      console.log('Sending to Supabase...', asset.id);
-      return { status: 'success', url: `https://tdpaintcell.com/blog/${asset.id}` };
+      console.log(`[SupabasePublish] Pushing to ${functionUrl} (asset: ${asset.id})`);
+
+      const res = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseConfig.pushSecret}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Supabase Edge Function returned ${res.status}: ${errBody.substring(0, 300)}`);
+      }
+
+      const result = await res.json();
+      console.log(`[SupabasePublish] Success: id=${result.id}, slug=${result.slug}`);
+
+      return {
+        status: 'success',
+        url: `${supabaseConfig.projectUrl.replace('.supabase.co', '')}/resources/${result.slug}`,
+        message: `内容已推送至客户独立站，等待客户审核发布 (id: ${result.id})`
+      };
     } catch (e) {
+      console.error(`[SupabasePublish] Error:`, (e as Error).message);
       return { status: 'error', message: (e as Error).message };
+    }
+  }
+}
+
+export class PublisherAdapterFactory {
+  static async create(productSlug: string): Promise<PublisherAdapter | null> {
+    const config = await ClientSiteConfig.findOne({ productSlug, isActive: true });
+
+    if (!config) {
+      console.log(`[PublisherFactory] No active ClientSiteConfig found for slug: ${productSlug}`);
+      return null;
+    }
+
+    switch (config.siteType) {
+      case 'supabase':
+        return new SupabasePublisherAdapter(config);
+      default:
+        console.log(`[PublisherFactory] Unsupported siteType: ${config.siteType}`);
+        return null;
     }
   }
 }

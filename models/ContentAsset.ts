@@ -176,7 +176,7 @@ const ContentAssetSchema = new Schema<IContentAsset>({
 });
 
 // Pre-save hook to generate slug from title
-ContentAssetSchema.pre('save', function(this: IContentAsset, next: Function) {
+ContentAssetSchema.pre('save', function(this: IContentAsset) {
   if (this.isModified('title') && !this.slug) {
     this.slug = this.title
       .toLowerCase()
@@ -192,7 +192,6 @@ ContentAssetSchema.pre('save', function(this: IContentAsset, next: Function) {
   if (this.isModified('secondaryKeywords') && this.secondaryKeywords?.length) {
     this.keywords = [this.focusKeyword, ...this.secondaryKeywords].filter(Boolean);
   }
-  next();
 });
 
 ContentAssetSchema.index({ status: 1 });

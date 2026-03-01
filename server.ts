@@ -26,6 +26,10 @@ import { getTenderPlatforms, calculateTenderStrength } from './lib/tender/platfo
 import { parseDocument, getSupportedFormats } from './lib/document-parser';
 import { initStageContext, stageTerminology, stageCompetitors, stageCertifications, stageChannels, stageExhibitions, stageTrends, stageStrategy, stageICP } from './lib/research-stages';
 import multer from 'multer';
+import { ClientSiteConfig } from './models/ClientSiteConfig';
+import { PushRecord } from './models/PushRecord';
+import { PublisherAdapterFactory } from './lib/publisher';
+import { initPushTimeoutChecker } from './services/push-timeout-checker';
 
 dotenv.config();
 
@@ -3228,7 +3232,7 @@ ${formatPrompts[format]}`;
 
   // --- Content Publishing ---
 
-  // Publish content asset (mark as published, track channels)
+  // Publish content asset (mark as published, track channels, push to client site)
   app.post('/api/seo/content/:id/publish', async (req, res) => {
     try {
       const asset = await ContentAsset.findById(req.params.id);
@@ -3253,7 +3257,49 @@ ${formatPrompts[format]}`;
         await ContentPlan.findByIdAndUpdate(asset.contentPlanId, { status: 'published' });
       }
 
-      res.json({ ...asset.toObject(), id: asset._id.toString() });
+      // --- Push to client site when channel is 'website' ---
+      let pushResult: any = null;
+      if (channel === 'website') {
+        // Find associated product to determine the client site
+        const products = await ProductModel.find();
+        const product = products[0]; // For now, use the first product; multi-product lookup by asset association will be added later
+
+        if (product) {
+          const adapter = await PublisherAdapterFactory.create(product.slug);
+          if (adapter) {
+            const assetData = { ...asset.toObject(), id: asset._id.toString() } as any;
+            const result = await adapter.publishContent(assetData);
+
+            // Find the site config for timeout calculation
+            const siteConfig = await ClientSiteConfig.findOne({ productSlug: product.slug, isActive: true });
+            const timeoutHours = siteConfig?.approvalTimeoutHours || 24;
+
+            const pushRecord = await PushRecord.create({
+              assetId: asset._id,
+              productSlug: product.slug,
+              status: result.status === 'success' ? 'pending' : 'failed',
+              targetUrl: result.url || '',
+              pushedAt: new Date(),
+              timeoutAt: new Date(Date.now() + timeoutHours * 60 * 60 * 1000),
+              retryCount: 0,
+              lastError: result.status === 'error' ? result.message : undefined,
+            });
+
+            pushResult = {
+              pushRecordId: pushRecord._id.toString(),
+              pushStatus: pushRecord.status,
+              targetUrl: result.url,
+              message: result.message,
+              timeoutAt: pushRecord.timeoutAt,
+            };
+            console.log(`[Publish] Push record created: ${pushRecord._id} (status: ${pushRecord.status})`);
+          } else {
+            pushResult = { message: 'No active site configuration found for this product' };
+          }
+        }
+      }
+
+      res.json({ ...asset.toObject(), id: asset._id.toString(), pushResult });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to publish content', details: err.message });
     }
@@ -3299,6 +3345,119 @@ ${formatPrompts[format]}`;
     res.status(500).json({ error: 'Internal server error', details: err.message });
   });
 
+  // ==================== Push Pipeline Records ====================
+
+  // List push records (with optional status filter)
+  app.get('/api/push-records', async (req, res) => {
+    try {
+      const { status, productSlug } = req.query;
+      const query: any = {};
+      if (status) query.status = status;
+      if (productSlug) query.productSlug = productSlug;
+
+      const records = await PushRecord.find(query).sort({ createdAt: -1 }).limit(100);
+      res.json(records.map(r => ({ ...r.toObject(), id: r._id.toString() })));
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch push records', details: err.message });
+    }
+  });
+
+  // Get timeout records (convenience endpoint)
+  app.get('/api/push-records/timeout', async (req, res) => {
+    try {
+      const records = await PushRecord.find({
+        status: { $in: ['timeout', 'escalated'] }
+      }).sort({ timeoutAt: -1 }).limit(50);
+      res.json(records.map(r => ({ ...r.toObject(), id: r._id.toString() })));
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch timeout records', details: err.message });
+    }
+  });
+
+  // Manually confirm a push record (client published the content)
+  app.post('/api/push-records/:id/confirm', async (req, res) => {
+    try {
+      const record = await PushRecord.findById(req.params.id);
+      if (!record) return res.status(404).json({ error: 'Push record not found' });
+
+      record.status = 'confirmed';
+      record.confirmedAt = new Date();
+      await record.save();
+
+      res.json({ ...record.toObject(), id: record._id.toString() });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to confirm push record', details: err.message });
+    }
+  });
+
+  // Retry a failed push
+  app.post('/api/push-records/:id/retry', async (req, res) => {
+    try {
+      const record = await PushRecord.findById(req.params.id);
+      if (!record) return res.status(404).json({ error: 'Push record not found' });
+
+      const asset = await ContentAsset.findById(record.assetId);
+      if (!asset) return res.status(404).json({ error: 'Associated content asset not found' });
+
+      const adapter = await PublisherAdapterFactory.create(record.productSlug);
+      if (!adapter) return res.status(400).json({ error: 'No active site configuration found' });
+
+      const assetData = { ...asset.toObject(), id: asset._id.toString() } as any;
+      const result = await adapter.publishContent(assetData);
+
+      const siteConfig = await ClientSiteConfig.findOne({ productSlug: record.productSlug, isActive: true });
+      const timeoutHours = siteConfig?.approvalTimeoutHours || 24;
+
+      record.status = result.status === 'success' ? 'pending' : 'failed';
+      record.targetUrl = result.url || record.targetUrl;
+      record.pushedAt = new Date();
+      record.timeoutAt = new Date(Date.now() + timeoutHours * 60 * 60 * 1000);
+      record.retryCount = (record.retryCount || 0) + 1;
+      record.lastError = result.status === 'error' ? result.message : undefined;
+      await record.save();
+
+      res.json({ ...record.toObject(), id: record._id.toString(), pushMessage: result.message });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to retry push', details: err.message });
+    }
+  });
+
+  // --- Client Site Config Management ---
+  app.get('/api/client-sites', async (req, res) => {
+    try {
+      const sites = await ClientSiteConfig.find().sort({ createdAt: -1 });
+      // Mask pushSecret in response
+      res.json(sites.map(s => {
+        const obj = s.toObject();
+        if (obj.supabaseConfig?.pushSecret) {
+          obj.supabaseConfig.pushSecret = '***';
+        }
+        return { ...obj, id: s._id.toString() };
+      }));
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch client sites', details: err.message });
+    }
+  });
+
+  app.post('/api/client-sites', async (req, res) => {
+    try {
+      const site = await ClientSiteConfig.create(req.body);
+      res.json({ ...site.toObject(), id: site._id.toString() });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to create client site config', details: err.message });
+    }
+  });
+
+  app.put('/api/client-sites/:id', async (req, res) => {
+    try {
+      const site = await ClientSiteConfig.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      if (!site) return res.status(404).json({ error: 'Client site config not found' });
+      res.json({ ...site.toObject(), id: site._id.toString() });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to update client site config', details: err.message });
+    }
+  });
+
   // --- Local Dev: Vite Middleware + Listen ---
   if (!process.env.VERCEL) {
     (async () => {
@@ -3319,6 +3478,7 @@ ${formatPrompts[format]}`;
       const PORT = 3000;
       app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on http://localhost:${PORT}`);
+        initPushTimeoutChecker();
       });
     })();
   }
