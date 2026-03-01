@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export type CompanyStatus = 'discovered' | 'researching' | 'researched' | 'scored' | 'outreached' | 'failed';
+export type CompanyStatus = 'discovered' | 'researching' | 'researched' | 'scored' | 'contacted' | 'replied' | 'won' | 'lost' | 'outreached' | 'failed';
 export type SignalType = 'regulation' | 'hiring' | 'expansion' | 'automation' | 'supply_chain' | 'facility' | 'tender';
 export type SignalStrength = 'trigger' | 'high' | 'medium' | 'low';
 export type LeadTier = 'Tier A (Critical Pain)' | 'Tier B (Active Change)' | 'Tier C (High Potential)' | 'Tier D (Cold Lead)';
@@ -79,6 +79,7 @@ const ScoringSchema = new Schema({
     enum: ['Tier A (Critical Pain)', 'Tier B (Active Change)', 'Tier C (High Potential)', 'Tier D (Cold Lead)']
   },
   breakdown: {
+    relevanceScore: { type: Number, default: 0 },
     triggerScore: { type: Number, default: 0 },
     behaviorScore: { type: Number, default: 0 },
     structuralScore: { type: Number, default: 0 }
@@ -106,6 +107,52 @@ const OutreachSchema = new Schema({
   },
   updatedAt: { type: Date, default: Date.now }
 });
+
+// Website Analysis subdocument (官网深度分析)
+const WebsiteAnalysisSchema = new Schema({
+  status: {
+    type: String,
+    enum: ['pending', 'analyzing', 'qualified', 'maybe', 'disqualified', 'failed'],
+    default: 'pending'
+  },
+  qualificationReason: { type: String },
+  relevanceScore: { type: Number, default: 0 },
+
+  // 业务特征提取
+  products: [{
+    name: { type: String },
+    description: { type: String }
+  }],
+  equipment: [{
+    type: { type: String },
+    brand: { type: String },
+    context: { type: String }
+  }],
+  technologies: [{ type: String }],
+  companySize: {
+    employees: { type: String },
+    facilities: { type: String },
+    indicators: [{ type: String }]
+  },
+
+  // 四维相关性评分
+  breakdown: {
+    industryMatch: { score: { type: Number }, reasoning: { type: String } },
+    businessRelevance: { score: { type: Number }, reasoning: { type: String } },
+    sizeMatch: { score: { type: Number }, reasoning: { type: String } },
+    technologyGap: { score: { type: Number }, reasoning: { type: String } }
+  },
+
+  // 爬取元数据
+  pagesCrawled: [{
+    url: { type: String },
+    pageType: { type: String },
+    success: { type: Boolean }
+  }],
+  language: { type: String },
+  analyzedAt: { type: Date },
+  errorMessage: { type: String }
+}, { _id: false });
 
 // Evidence subdocument
 const EvidenceSchema = new Schema({
@@ -145,11 +192,50 @@ export interface ICompany extends Document {
     issuingAuthority: string;
     tenderUrl?: string;
   };
+  websiteAnalysis?: {
+    status: 'pending' | 'analyzing' | 'qualified' | 'maybe' | 'disqualified' | 'failed';
+    qualificationReason?: string;
+    relevanceScore: number;
+    products: Array<{ name: string; description?: string }>;
+    equipment: Array<{ type: string; brand?: string; context?: string }>;
+    technologies: string[];
+    companySize?: {
+      employees?: string;
+      facilities?: string;
+      indicators?: string[];
+    };
+    breakdown: {
+      industryMatch: { score: number; reasoning: string };
+      businessRelevance: { score: number; reasoning: string };
+      sizeMatch: { score: number; reasoning: string };
+      technologyGap: { score: number; reasoning: string };
+    };
+    pagesCrawled: Array<{ url: string; pageType: string; success: boolean }>;
+    language?: string;
+    analyzedAt?: Date;
+    errorMessage?: string;
+  };
   contacts: typeof ContactSchema[];
   evidence: typeof EvidenceSchema[];
   research?: typeof ResearchSchema;
   score?: typeof ScoringSchema;
   outreach?: typeof OutreachSchema;
+  outreachHistory?: Array<{
+    type: string;
+    channel: string;
+    emailType?: string;
+    toEmail?: string;
+    subject?: string;
+    sentAt: Date;
+    messageId?: string;
+    status: string;
+  }>;
+  followUpNotes?: Array<{
+    type: string;
+    note: string;
+    createdAt: Date;
+  }>;
+  lastOutreachAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -164,16 +250,33 @@ const CompanySchema = new Schema<ICompany>({
   source: { type: String },
   status: { 
     type: String, 
-    enum: ['discovered', 'researching', 'researched', 'scored', 'outreached', 'failed'],
+    enum: ['discovered', 'researching', 'researched', 'scored', 'contacted', 'replied', 'won', 'lost', 'outreached', 'failed'],
     default: 'discovered'
   },
   notes: { type: String },
   tenderMetadata: TenderMetadataSchema,
+  websiteAnalysis: WebsiteAnalysisSchema,
   contacts: [ContactSchema],
   evidence: [EvidenceSchema],
   research: ResearchSchema,
   score: ScoringSchema,
-  outreach: OutreachSchema
+  outreach: OutreachSchema,
+  outreachHistory: [{
+    type: { type: String },
+    channel: { type: String },
+    emailType: { type: String },
+    toEmail: { type: String },
+    subject: { type: String },
+    sentAt: { type: Date },
+    messageId: { type: String },
+    status: { type: String }
+  }],
+  followUpNotes: [{
+    type: { type: String },
+    note: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  lastOutreachAt: { type: Date }
 }, {
   timestamps: true
 });
@@ -183,5 +286,7 @@ CompanySchema.index({ leadRunId: 1 });
 CompanySchema.index({ status: 1 });
 CompanySchema.index({ 'score.total': -1 });
 CompanySchema.index({ name: 'text', industry: 'text' });
+CompanySchema.index({ 'websiteAnalysis.status': 1 });
+CompanySchema.index({ domain: 1 });
 
 export const Company = mongoose.model<ICompany>('Company', CompanySchema);

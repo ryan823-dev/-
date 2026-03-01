@@ -33,6 +33,7 @@ import {
   BookOpen,
   Megaphone
 } from 'lucide-react';
+import ModuleHeader from './ModuleHeader';
 import type { PRArticle } from '../types';
 
 // ---- Types ----
@@ -396,33 +397,22 @@ const SocialPresence: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900 flex items-center gap-3">
-            <Globe size={28} className="text-gold" />
-            {'\u51fa\u6d77\u58f0\u91cf\u67a2\u7ebd'}
-          </h1>
-          <p className="text-sm text-slate-500 mt-2">
-            {'\u793e\u4ea4\u5a92\u4f53 + PR \u4e00\u4f53\u5316\u7ba1\u7406 \u00b7 AI \u5185\u5bb9\u6539\u5199 \u00b7 \u591a\u5e73\u53f0\u5206\u53d1\u8ffd\u8e2a'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab('content-bridge')}
-            className="bg-white text-navy-900 border border-border px-5 py-3 rounded-2xl text-sm font-bold hover:bg-slate-50 transition-all flex items-center gap-2"
-          >
-            <Repeat2 size={16} />
-            AI {'\u6539\u5199'}
-          </button>
-          <button
-            onClick={() => setActiveTab('compose')}
-            className="bg-navy-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-navy-800 transition-all shadow-xl flex items-center gap-2"
-          >
-            <Plus size={18} />
-            {'\u521b\u5efa\u5185\u5bb9'}
-          </button>
-        </div>
-      </div>
+      <ModuleHeader icon={Globe} title="出海声量枢纽" subtitle="社交媒体 + PR 一体化管理 · AI 内容改写 · 多平台分发追踪">
+        <button
+          onClick={() => setActiveTab('content-bridge')}
+          className="bg-white text-navy-900 border border-border px-5 py-3 rounded-2xl text-sm font-bold hover:bg-slate-50 transition-all flex items-center gap-2"
+        >
+          <Repeat2 size={16} />
+          AI 改写
+        </button>
+        <button
+          onClick={() => setActiveTab('compose')}
+          className="bg-navy-900 text-white px-6 py-3 rounded-2xl text-sm font-bold hover:bg-navy-800 transition-all shadow-xl flex items-center gap-2"
+        >
+          <Plus size={18} />
+          创建内容
+        </button>
+      </ModuleHeader>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border pb-0 overflow-x-auto">

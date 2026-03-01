@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
+import { Resend } from 'resend';
 import { connectDB } from './lib/db';
 import { generateAIContent } from './lib/ai/chat';
 import * as schemas from './lib/ai/schemas';
@@ -25,6 +26,10 @@ import { getLinkedInAuthorizationUrl, exchangeLinkedInCode, getLinkedInOAuthConf
 import { getTenderPlatforms, calculateTenderStrength } from './lib/tender/platforms';
 import { parseDocument, getSupportedFormats } from './lib/document-parser';
 import { initStageContext, stageTerminology, stageCompetitors, stageCertifications, stageChannels, stageExhibitions, stageTrends, stageStrategy, stageICP } from './lib/research-stages';
+import { crawlWebsite } from './lib/website-crawler';
+import { analyzeRelevance, analyzeFromSearchContext } from './lib/ai/relevance-analyzer';
+import { buildAIContext } from './lib/ai/context-builder';
+import { getBossPrompt, getStaffPrompt } from './lib/ai/prompt-templates';
 import multer from 'multer';
 import { ClientSiteConfig } from './models/ClientSiteConfig';
 import { PushRecord } from './models/PushRecord';
@@ -618,7 +623,7 @@ app.use(async (req, res, next) => {
         strategy: strategy || 'comprehensive',
         status: 'queued',
         progress: {
-          discovery: 0, enrichment: 0, contact: 0, research: 0, outreach: 0, total: 0,
+          discovery: 0, websiteAnalysis: 0, enrichment: 0, contact: 0, research: 0, outreach: 0, total: 0,
           currentStage: 'idle', 
           totalQueries,
           completedQueries: 0,
@@ -627,7 +632,7 @@ app.use(async (req, res, next) => {
         }
       });
 
-      res.json({ ...run.toObject(), id: run._id.toString() });
+      res.json({ ...run!.toObject(), id: run!._id.toString() });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to create run', details: err.message });
     }
@@ -806,7 +811,7 @@ app.use(async (req, res, next) => {
         }
       }
 
-      // Save discovered companies (dedup)
+      // Save discovered companies (dedup within run + cross-run websiteAnalysis reuse)
       const saved: any[] = [];
       for (const fc of foundCompanies) {
         if (!fc.name) continue;
@@ -820,7 +825,21 @@ app.use(async (req, res, next) => {
         let domain = '';
         try { if (fc.website) domain = new URL(fc.website).hostname.replace('www.', ''); } catch {}
 
-        const company = await CompanyModel.create({
+        // Cross-run dedup: check if this domain already has websiteAnalysis in another run
+        let existingAnalysis: any = null;
+        if (domain) {
+          const crossRunCompany = await CompanyModel.findOne({
+            domain,
+            leadRunId: { $ne: run._id },
+            'websiteAnalysis.status': { $in: ['qualified', 'maybe', 'disqualified'] }
+          }).sort({ 'websiteAnalysis.analyzedAt': -1 });
+          if (crossRunCompany?.websiteAnalysis) {
+            existingAnalysis = crossRunCompany.websiteAnalysis;
+            console.log(`[Discovery] Cross-run reuse: ${fc.name} (${domain}) -> ${existingAnalysis.status}`);
+          }
+        }
+
+        const companyData: any = {
           leadRunId: run._id,
           name: fc.name,
           website: fc.website || '',
@@ -830,7 +849,15 @@ app.use(async (req, res, next) => {
           source: `${strategy} search: ${query}`,
           status: 'discovered',
           notes: fc.matchReason || ''
-        });
+        };
+
+        // Reuse existing websiteAnalysis if available
+        if (existingAnalysis) {
+          companyData.websiteAnalysis = existingAnalysis;
+          companyData.status = existingAnalysis.status === 'disqualified' ? 'failed' : 'discovered';
+        }
+
+        const company = await CompanyModel.create(companyData);
         saved.push({ ...company.toObject(), id: company._id.toString() });
         progress.discovery++;
         currentCountry.companiesFound = (currentCountry.companiesFound || 0) + 1;
@@ -852,6 +879,153 @@ app.use(async (req, res, next) => {
     } catch (err: any) {
       console.error('[Discovery] Error:', err);
       res.status(500).json({ error: 'Discovery failed', details: err.message });
+    }
+  });
+
+  // --- Stage: Company Enrichment (per company) ---
+
+  // --- Stage: Website Analysis (per company) ---
+  app.post('/api/runs/:runId/analyze-website/:companyId', async (req, res) => {
+    try {
+      const run = await LeadRunModel.findById(req.params.runId);
+      if (!run) return res.status(404).json({ error: 'Run not found' });
+
+      const company = await CompanyModel.findById(req.params.companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      // Skip if already analyzed (e.g., from cross-run reuse during discovery)
+      const existingWa = (company as any).websiteAnalysis;
+      if (existingWa && ['qualified', 'maybe', 'disqualified'].includes(existingWa.status)) {
+        console.log(`[WebsiteAnalysis] Skipping ${company.name} - already analyzed: ${existingWa.status}`);
+        run.progress.websiteAnalysis = (run.progress.websiteAnalysis || 0) + 1;
+        run.progress.total = run.progress.discovery + run.progress.websiteAnalysis;
+        await run.save();
+        return res.json({
+          company: { ...company.toObject(), id: company._id.toString() },
+          qualification: existingWa.status.toUpperCase(),
+          relevanceScore: existingWa.relevanceScore || 0,
+          reasoning: existingWa.qualificationReason || 'Reused from previous analysis',
+          progress: run.progress
+        });
+      }
+
+      const product = await ProductModel.findById(run.productId);
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      (run.progress as any).currentStage = 'website-analysis';
+      await run.save();
+
+      console.log(`[WebsiteAnalysis] Processing: ${company.name} (${company.website || 'no website'})`);
+
+      const productInfo = {
+        name: product.name,
+        productType: product.productType,
+        icpProfile: product.icpProfile ? {
+          industryTags: product.icpProfile.industryTags,
+          targetCustomerTypes: product.icpProfile.targetCustomerTypes,
+          disqualifiers: product.icpProfile.disqualifiers,
+          scenarioPack: product.icpProfile.scenarioPack,
+          painPoints: (product.icpProfile as any).painPoints,
+        } : undefined,
+      };
+
+      let result: any;
+
+      if (company.website) {
+        // Path A: Has website - crawl and analyze
+        const crawlResult = await crawlWebsite(company.website);
+
+        if (crawlResult.pages.some(p => p.success)) {
+          // Successfully crawled at least one page
+          result = await analyzeRelevance(crawlResult.pages, productInfo, crawlResult.language);
+
+          (company as any).websiteAnalysis = {
+            ...result,
+            status: result.qualification.toLowerCase(),
+            pagesCrawled: crawlResult.pages.map(p => ({
+              url: p.url,
+              pageType: p.pageType,
+              success: p.success
+            })),
+            language: crawlResult.language,
+            analyzedAt: new Date()
+          };
+        } else {
+          // Crawl failed - fallback to Brave search
+          console.log(`[WebsiteAnalysis] Crawl failed for ${company.name}, falling back to search`);
+          let searchContext = '';
+          try {
+            if (process.env.BRAVE_SEARCH_API_KEY) {
+              const searchResults = await braveSearch(`"${company.name}" ${company.country} ${company.industry}`, 5);
+              searchContext = searchResults.map((r: any) => `- ${r.title}: ${r.description}`).join('\n');
+            }
+          } catch { /* silent */ }
+
+          result = await analyzeFromSearchContext(
+            company.name, company.country, company.industry, searchContext, productInfo
+          );
+
+          (company as any).websiteAnalysis = {
+            ...result,
+            status: result.qualification.toLowerCase(),
+            pagesCrawled: crawlResult.pages.map(p => ({
+              url: p.url, pageType: p.pageType, success: p.success
+            })),
+            language: 'unknown',
+            analyzedAt: new Date(),
+            errorMessage: crawlResult.error || 'Crawl failed, used search fallback'
+          };
+        }
+      } else {
+        // Path B: No website - Brave search fallback
+        console.log(`[WebsiteAnalysis] No website for ${company.name}, using search fallback`);
+        let searchContext = '';
+        try {
+          if (process.env.BRAVE_SEARCH_API_KEY) {
+            const searchResults = await braveSearch(`"${company.name}" ${company.country} ${company.industry}`, 5);
+            searchContext = searchResults.map((r: any) => `- ${r.title}: ${r.description}`).join('\n');
+          }
+        } catch { /* silent */ }
+
+        result = await analyzeFromSearchContext(
+          company.name, company.country, company.industry, searchContext, productInfo
+        );
+
+        (company as any).websiteAnalysis = {
+          ...result,
+          status: result.qualification.toLowerCase(),
+          pagesCrawled: [],
+          language: 'unknown',
+          analyzedAt: new Date(),
+          errorMessage: 'No website available, used search fallback'
+        };
+      }
+
+      // Update company status based on qualification
+      if (result.qualification === 'DISQUALIFIED') {
+        company.status = 'failed';
+      } else {
+        company.status = 'researching';
+      }
+      await company.save();
+
+      // Update progress
+      run.progress.websiteAnalysis = (run.progress.websiteAnalysis || 0) + 1;
+      run.progress.total = run.progress.discovery + run.progress.websiteAnalysis;
+      await run.save();
+
+      console.log(`[WebsiteAnalysis] ${company.name}: ${result.qualification} (score: ${result.relevanceScore})`);
+
+      res.json({
+        company: { ...company.toObject(), id: company._id.toString() },
+        qualification: result.qualification,
+        relevanceScore: result.relevanceScore,
+        reasoning: result.qualificationReason,
+        progress: run.progress
+      });
+    } catch (err: any) {
+      console.error('[WebsiteAnalysis] Error:', err);
+      res.status(500).json({ error: 'Website analysis failed', details: err.message });
     }
   });
 
@@ -911,9 +1085,23 @@ app.use(async (req, res, next) => {
       // Tier 2: Brave + DashScope
       if (signals.length === 0 && process.env.BRAVE_SEARCH_API_KEY) {
         try {
-          const searchResults = await braveSearch(`${company.name} ${company.country} news hiring expansion`, 8);
+          // Build smarter search query using website analysis data if available
+          const wa = (company as any).websiteAnalysis;
+          let searchQuery: string;
+          if (wa?.products?.length) {
+            const productKeywords = wa.products.slice(0, 2).map((p: any) => p.name).join(' ');
+            searchQuery = `"${company.name}" ${productKeywords} automation upgrade ${company.country}`;
+          } else {
+            searchQuery = `${company.name} ${company.country} news hiring expansion`;
+          }
+          const searchResults = await braveSearch(searchQuery, 8);
           const context = searchResults.map((r: any) => `- ${r.title}: ${r.description}`).join('\n');
-          const parsePrompt = `Analyze these results about "${company.name}" and identify business signals: hiring, regulation, expansion, automation, tender. Return JSON array with type, subType, strength (trigger/high/medium/low), snippet.\n\nResults:\n${context}`;
+
+          // Inject website analysis context into AI prompt for better signal detection
+          const waContext = wa?.products?.length
+            ? `\nKnown business: ${wa.products.map((p: any) => p.name).join(', ')}. Known equipment: ${(wa.equipment || []).map((e: any) => e.type).join(', ') || 'unknown'}.`
+            : '';
+          const parsePrompt = `Analyze these results about "${company.name}" and identify business signals: hiring, regulation, expansion, automation, tender.${waContext} Return JSON array with type, subType, strength (trigger/high/medium/low), snippet.\n\nResults:\n${context}`;
           const parseResult = await generateAIContent(parsePrompt, {
             responseSchema: { type: 'array', items: { type: 'object', properties: { type: { type: 'string' }, subType: { type: 'string' }, strength: { type: 'string' }, snippet: { type: 'string' } } } },
             temperature: 0.3
@@ -964,13 +1152,21 @@ app.use(async (req, res, next) => {
         });
       }
 
-      // Score
+      // Score (enhanced with website analysis relevance)
+      const relevanceScore = (company as any).websiteAnalysis?.relevanceScore || 50;
+      const hasTrigger = processedSignals.some((s: any) => s.strength === 'trigger');
+      const hasHigh = processedSignals.some((s: any) => s.strength === 'high');
+
       let tier = 'Tier D (Cold Lead)';
-      if (processedSignals.some((s: any) => s.strength === 'trigger')) tier = 'Tier A (Critical Pain)';
-      else if (processedSignals.some((s: any) => s.strength === 'high')) tier = 'Tier B (Active Change)';
+      if (hasTrigger && relevanceScore >= 50) tier = 'Tier A (Critical Pain)';
+      else if (hasTrigger) tier = 'Tier B (Active Change)';
+      else if (hasHigh && relevanceScore >= 50) tier = 'Tier B (Active Change)';
+      else if (hasHigh || relevanceScore >= 60) tier = 'Tier C (High Potential)';
       else if (processedSignals.length > 0) tier = 'Tier C (High Potential)';
 
-      const totalScore = tier.includes('A') ? 95 : tier.includes('B') ? 75 : tier.includes('C') ? 50 : 25;
+      // Combined score: website relevance (40%) + signal strength (60%)
+      const signalScore = hasTrigger ? 95 : hasHigh ? 75 : processedSignals.length > 0 ? 50 : 25;
+      const totalScore = Math.round(relevanceScore * 0.4 + signalScore * 0.6);
 
       company.research = {
         summary: `AI analyzed ${company.name}: ${processedSignals.length} signals found.`,
@@ -983,11 +1179,15 @@ app.use(async (req, res, next) => {
       company.score = {
         total: totalScore, tier,
         breakdown: {
+          relevanceScore: relevanceScore,
           triggerScore: processedSignals.filter((s: any) => s.strength === 'trigger').length * 30,
           behaviorScore: processedSignals.filter((s: any) => s.strength === 'high').length * 20,
           structuralScore: processedSignals.length > 0 ? 50 : 20
         },
-        reasons: processedSignals.map((s: any) => s.subType),
+        reasons: [
+          ...processedSignals.map((s: any) => s.subType),
+          ...((company as any).websiteAnalysis?.qualification ? [`website:${(company as any).websiteAnalysis.qualification}`] : [])
+        ],
         updatedAt: new Date()
       } as any;
 
@@ -1184,10 +1384,62 @@ app.use(async (req, res, next) => {
         research: obj.research || null,
         score: obj.score || null,
         outreach: obj.outreach || null,
-        evidence: obj.evidence || []
+        evidence: obj.evidence || [],
+        outreachHistory: obj.outreachHistory || [],
+        followUpNotes: obj.followUpNotes || []
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to fetch company', details: err.message });
+    }
+  });
+
+  // Update company status
+  app.patch('/api/companies/:id/status', async (req, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['discovered', 'researching', 'researched', 'scored', 'contacted', 'replied', 'won', 'lost', 'outreached', 'failed'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status', validStatuses });
+      }
+
+      const company = await CompanyModel.findByIdAndUpdate(
+        req.params.id,
+        { status, updatedAt: new Date() },
+        { new: true }
+      );
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      res.json({ success: true, status: company.status });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to update status', details: err.message });
+    }
+  });
+
+  // Add follow-up note
+  app.post('/api/companies/:id/follow-up', async (req, res) => {
+    try {
+      const { note, type = 'note' } = req.body;
+      if (!note) return res.status(400).json({ error: 'note is required' });
+
+      const followUpEntry = {
+        type,  // 'note', 'call', 'email', 'meeting'
+        note,
+        createdAt: new Date()
+      };
+
+      const company = await CompanyModel.findByIdAndUpdate(
+        req.params.id,
+        { 
+          $push: { followUpNotes: followUpEntry },
+          updatedAt: new Date()
+        },
+        { new: true }
+      );
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      res.json({ success: true, followUpNotes: company.followUpNotes });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to add follow-up note', details: err.message });
     }
   });
 
@@ -2336,27 +2588,23 @@ Requirements:
       const { message, role, context } = req.body;
       if (!message) return res.status(400).json({ error: 'Message is required' });
 
-      // Gather real system context
-      const productCount = await ProductModel.countDocuments();
-      const runCount = await LeadRunModel.countDocuments();
-      const companyCount = await CompanyModel.countDocuments();
-      const postCount = await SocialPostModel.countDocuments({ status: 'published' });
-      const products = await ProductModel.find().limit(3);
+      // 判断角色
+      const roleType = (role === '决策者' || role === 'CEO') ? 'BOSS' : 'STAFF';
+
+      // 构建业务上下文
+      const aiContext = await buildAIContext({
+        role: roleType,
+        currentPage: context?.currentPage
+      });
+
+      // 选择对应角色的系统提示词
+      const systemPrompt = roleType === 'BOSS'
+        ? getBossPrompt(aiContext)
+        : getStaffPrompt(aiContext);
 
       const { content: reply } = await generateAIContent(
         `用户提问: ${message}`,
-        {
-          systemPrompt: `你是 VertaX 出海获客智能体，为制造企业出海提供增长战略建议。
-当前系统数据：
-- 已建模产品: ${productCount} 个
-- 已执行获客任务: ${runCount} 次
-- 已发现潜在客户: ${companyCount} 家
-- 已发布社交内容: ${postCount} 条
-- 产品列表: ${products.map(p => p.name).join(', ')}
-当前用户角色: ${role || 'CEO'}
-
-请以专业的出海获客顾问身份回答，简洁精炼，提供可执行的建议。如涉及系统功能，可引导用户使用相关模块。回答使用中文。`
-        }
+        { systemPrompt }
       );
 
       res.json({ reply: reply || '抱歉，我暂时无法处理这个请求。' });
@@ -2438,6 +2686,453 @@ All emails should cite specific evidence found about the company.`,
     }
   });
 
+  // ==================== Knowledge Cards API (Dynamic from Products) ====================
+  app.get('/api/knowledge-cards', async (req, res) => {
+    try {
+      const products = await ProductModel.find().lean();
+      const cards: any[] = [];
+
+      for (const product of products) {
+        // 产品基础卡片
+        const productFields: any[] = [
+          { fieldKey: 'name', label: '产品名称', value: product.name },
+          { fieldKey: 'productType', label: '产品类型', value: product.productType || '未设置' },
+          { fieldKey: 'coatingType', label: '涂装类型', value: product.coatingType || '未设置' },
+          { fieldKey: 'workpieceSize', label: '工件尺寸', value: product.workpieceSize || '未设置' },
+          { fieldKey: 'automationLevel', label: '自动化等级', value: product.automationLevel || '未设置' },
+        ];
+
+        if (product.targetCountries?.length) {
+          productFields.push({ fieldKey: 'targetCountries', label: '目标国家', value: product.targetCountries.join(', ') });
+        }
+        if (product.applicationIndustries?.length) {
+          productFields.push({ fieldKey: 'applicationIndustries', label: '应用行业', value: product.applicationIndustries.join(', ') });
+        }
+
+        // 计算完成度
+        const totalFields = 7;
+        const filledFields = productFields.filter(f => f.value && f.value !== '未设置').length;
+        const completion = Math.round((filledFields / totalFields) * 100);
+
+        const missingFields: any[] = [];
+        if (!product.coatingType) missingFields.push({ fieldKey: 'coatingType', label: '涂装类型', reason: '缺少涂装类型信息', impact: '影响 ICP 画像生成精度' });
+        if (!product.workpieceSize) missingFields.push({ fieldKey: 'workpieceSize', label: '工件尺寸', reason: '缺少工件尺寸范围', impact: '影响客户匹配度判断' });
+        if (!product.automationLevel) missingFields.push({ fieldKey: 'automationLevel', label: '自动化等级', reason: '未指定自动化程度', impact: '影响价格区间定位' });
+
+        cards.push({
+          id: `product-${product._id}`,
+          type: 'Offering',
+          title: `${product.name} 产品画像`,
+          fields: productFields,
+          completion,
+          confidence: completion > 70 ? 95 : 75,
+          missingFields,
+          evidence: [{ sourceId: `src-${product._id}`, sourceName: '产品建模数据' }]
+        });
+
+        // ICP 画像卡片（如果存在）
+        if (product.icpProfile) {
+          const icp = product.icpProfile;
+          const icpFields: any[] = [];
+
+          if (icp.industryTags?.length) {
+            icpFields.push({ fieldKey: 'industryTags', label: '目标行业标签', value: icp.industryTags.join(', ') });
+          }
+          if (icp.targetCustomerTypes?.length) {
+            icpFields.push({ fieldKey: 'targetCustomerTypes', label: '目标客户类型', value: icp.targetCustomerTypes.join(', ') });
+          }
+          if (icp.targetTitles?.length) {
+            icpFields.push({ fieldKey: 'targetTitles', label: '决策人职位', value: icp.targetTitles.join(', ') });
+          }
+          if (icp.disqualifiers?.length) {
+            icpFields.push({ fieldKey: 'disqualifiers', label: '排除条件', value: icp.disqualifiers.join('; ') });
+          }
+          if (icp.scenarioPack?.length) {
+            icpFields.push({ fieldKey: 'scenarioPack', label: '典型场景', value: icp.scenarioPack.slice(0, 3).join('; ') });
+          }
+
+          // queryPack 统计
+          const queryCount = (icp.queryPack?.google?.length || 0) + (icp.queryPack?.linkedin?.length || 0) + (icp.queryPack?.directories?.length || 0) + (icp.queryPack?.tender?.length || 0);
+          if (queryCount > 0) {
+            icpFields.push({ fieldKey: 'queryPack', label: '搜索查询包', value: `${queryCount} 条查询语句` });
+          }
+
+          // signalPack 统计
+          const signalCount = (icp.signalPack?.regulation?.length || 0) + (icp.signalPack?.hiring?.length || 0) + (icp.signalPack?.expansion?.length || 0) + (icp.signalPack?.automation?.length || 0);
+          if (signalCount > 0) {
+            icpFields.push({ fieldKey: 'signalPack', label: '信号识别包', value: `${signalCount} 条信号规则` });
+          }
+
+          const icpCompletion = icpFields.length >= 5 ? 90 : icpFields.length >= 3 ? 70 : 50;
+          const icpMissing: any[] = [];
+          if (!icp.targetTitles?.length) icpMissing.push({ fieldKey: 'targetTitles', label: '决策人职位', reason: '未定义目标联系人角色', impact: '影响联系人发现精准度' });
+          if (queryCount === 0) icpMissing.push({ fieldKey: 'queryPack', label: '搜索查询包', reason: '无搜索查询语句', impact: '无法启动获客任务' });
+
+          cards.push({
+            id: `icp-${product._id}`,
+            type: 'Proof',
+            title: `${product.name} ICP 客户画像`,
+            fields: icpFields,
+            completion: icpCompletion,
+            confidence: icpCompletion > 70 ? 92 : 70,
+            missingFields: icpMissing,
+            evidence: [{ sourceId: `icp-src-${product._id}`, sourceName: 'AI 生成 ICP 画像' }]
+          });
+        }
+      }
+
+      // 添加企业画像卡片（基于第一个产品或默认）
+      if (products.length > 0) {
+        cards.unshift({
+          id: 'company-profile',
+          type: 'Company',
+          title: '涂豆科技 (tdpaintcell) 企业画像',
+          fields: [
+            { fieldKey: 'name', label: '企业名称', value: '涂豆科技' },
+            { fieldKey: 'positioning', label: '品牌定位', value: '喷涂机器人自动化集成专家' },
+            { fieldKey: 'products', label: '产品线', value: products.map(p => p.name).join(', ') },
+            { fieldKey: 'markets', label: '目标市场', value: [...new Set(products.flatMap(p => p.targetCountries || []))].join(', ') || '未设置' }
+          ],
+          completion: 85,
+          confidence: 95,
+          missingFields: [],
+          evidence: [{ sourceId: 'company-src', sourceName: '系统产品数据汇总' }]
+        });
+      }
+
+      res.json(cards);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to generate knowledge cards', details: err.message });
+    }
+  });
+
+  // ==================== Outreach Email Generation ====================
+  app.post('/api/outreach/generate-email', async (req, res) => {
+    try {
+      const { companyId, contactName, contactTitle, language = 'en' } = req.body;
+      if (!companyId) return res.status(400).json({ error: 'companyId is required' });
+
+      const company = await CompanyModel.findById(companyId);
+      if (!company) return res.status(404).json({ error: 'Company not found' });
+
+      // 获取关联的产品信息
+      let product = null;
+      if (company.leadRunId) {
+        const run = await LeadRunModel.findById(company.leadRunId);
+        if (run?.productId) {
+          product = await ProductModel.findById(run.productId);
+        }
+      }
+
+      // 构建邮件生成提示
+      const companyInfo = {
+        name: company.name,
+        industry: company.industry,
+        country: company.country,
+        website: company.website,
+        signals: company.research?.signals?.slice(0, 3).map(s => ({
+          type: s.type,
+          snippet: s.evidence?.snippet
+        })) || [],
+        keyHooks: company.research?.keyHooks || [],
+        score: company.score?.total,
+        tier: company.score?.tier
+      };
+
+      const productInfo = product ? {
+        name: product.name,
+        type: product.productType,
+        advantages: product.advantages?.slice(0, 3).map(a => `${a.label}: ${a.value}`).join('; ')
+      } : null;
+
+      const prompt = `Generate a professional B2B outreach email in ${language === 'zh' ? 'Chinese' : 'English'}.
+
+Target Company:
+- Name: ${companyInfo.name}
+- Industry: ${companyInfo.industry}
+- Country: ${companyInfo.country}
+${companyInfo.signals.length > 0 ? `- Relevant Signals: ${companyInfo.signals.map(s => s.snippet).join('; ')}` : ''}
+${companyInfo.keyHooks.length > 0 ? `- Key Hooks: ${companyInfo.keyHooks.join('; ')}` : ''}
+
+Contact: ${contactName || 'Decision Maker'} (${contactTitle || 'Executive'})
+
+${productInfo ? `Our Product:
+- Name: ${productInfo.name}
+- Type: ${productInfo.type}
+- Key Advantages: ${productInfo.advantages}` : ''}
+
+Requirements:
+1. Subject line: Attention-grabbing, personalized
+2. Opening: Reference a specific signal or hook about their business
+3. Value proposition: How our solution addresses their specific needs
+4. CTA: Clear next step (demo, call, etc.)
+5. Keep it under 150 words
+6. Professional but warm tone
+
+Return JSON format:
+{
+  "subject": "email subject",
+  "body": "email body",
+  "followUpSubject": "follow-up email subject",
+  "followUpBody": "follow-up email body (shorter)"
+}`;
+
+      const { content } = await generateAIContent(prompt, {
+        systemPrompt: 'You are an expert B2B sales copywriter. Generate compelling, personalized outreach emails. Always return valid JSON.'
+      });
+
+      // 尝试解析 JSON
+      let emailContent;
+      try {
+        // 清理可能的 markdown 代码块
+        const cleaned = content?.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        emailContent = JSON.parse(cleaned || '{}');
+      } catch {
+        // 如果解析失败，构造默认格式
+        emailContent = {
+          subject: `Partnership Opportunity - ${product?.name || 'Industrial Automation'}`,
+          body: content || 'Failed to generate email content',
+          followUpSubject: `Following up - ${companyInfo.name}`,
+          followUpBody: 'I wanted to follow up on my previous email...'
+        };
+      }
+
+      // 保存到公司的 outreach 字段
+      await CompanyModel.findByIdAndUpdate(companyId, {
+        outreach: {
+          emailA: { subject: emailContent.subject, body: emailContent.body, citedEvidenceIds: [] },
+          emailB: { subject: emailContent.followUpSubject, body: emailContent.followUpBody, citedEvidenceIds: [] },
+          whatsapp: { message: emailContent.body?.substring(0, 200) + '...', citedEvidenceIds: [] },
+          updatedAt: new Date()
+        }
+      });
+
+      res.json(emailContent);
+    } catch (err: any) {
+      console.error('Email generation error:', err);
+      res.status(500).json({ error: 'Failed to generate email', details: err.message });
+    }
+  });
+
+  // ==================== Send Outreach Email (Resend) ====================
+  app.post('/api/outreach/send-email', async (req, res) => {
+    try {
+      const { companyId, toEmail, subject, body, emailType = 'emailA' } = req.body;
+      
+      if (!toEmail || !subject || !body) {
+        return res.status(400).json({ error: 'toEmail, subject, and body are required' });
+      }
+
+      // 检查 Resend API Key
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        return res.status(500).json({ 
+          error: 'Email service not configured', 
+          details: 'RESEND_API_KEY not set in environment variables' 
+        });
+      }
+
+      const resend = new Resend(resendApiKey);
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@vertax.top';
+      const fromName = process.env.RESEND_FROM_NAME || 'VertaX';
+
+      // 发送邮件
+      const { data, error } = await resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: [toEmail],
+        subject: subject,
+        html: body.replace(/\n/g, '<br>'),  // 简单的换行转换
+        text: body,
+      });
+
+      if (error) {
+        console.error('Resend error:', error);
+        return res.status(500).json({ error: 'Failed to send email', details: error.message });
+      }
+
+      // 更新公司状态和发送记录
+      if (companyId) {
+        const company = await CompanyModel.findById(companyId);
+        if (company) {
+          // 初始化 outreachHistory 如果不存在
+          const history = company.outreachHistory || [];
+          history.push({
+            type: 'email',
+            channel: 'resend',
+            emailType,
+            toEmail,
+            subject,
+            sentAt: new Date(),
+            messageId: data?.id,
+            status: 'sent'
+          });
+
+          await CompanyModel.findByIdAndUpdate(companyId, {
+            status: 'outreached',
+            outreachHistory: history,
+            lastOutreachAt: new Date()
+          });
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        messageId: data?.id,
+        message: `Email sent successfully to ${toEmail}` 
+      });
+    } catch (err: any) {
+      console.error('Send email error:', err);
+      res.status(500).json({ error: 'Failed to send email', details: err.message });
+    }
+  });
+
+  // ==================== Client Actions API (Dynamic) ====================
+  app.get('/api/client-actions', async (req, res) => {
+    try {
+      const actions: any[] = [];
+      let actionId = 1;
+
+      // 1. 检查产品 ICP 完整度
+      const products = await ProductModel.find().lean();
+      for (const product of products) {
+        if (!product.icpProfile) {
+          actions.push({
+            id: `act-${actionId++}`,
+            type: '资料补齐',
+            priority: 'P0',
+            status: '待处理',
+            sourceModule: '专业知识引擎',
+            title: `为「${product.name}」生成 ICP 客户画像`,
+            reason: '该产品尚未生成 ICP 画像，无法启动精准获客任务。',
+            impact: '阻塞获客任务创建，影响整体获客进度',
+            ctaLabel: '去生成 ICP',
+            ctaRoute: `knowledge-engine?productId=${product._id}&action=generate-icp`
+          });
+        } else {
+          const icp = product.icpProfile;
+          const queryCount = (icp.queryPack?.google?.length || 0) + (icp.queryPack?.linkedin?.length || 0);
+          if (queryCount === 0) {
+            actions.push({
+              id: `act-${actionId++}`,
+              type: '资料补齐',
+              priority: 'P0',
+              status: '待处理',
+              sourceModule: '专业知识引擎',
+              title: `完善「${product.name}」的搜索查询包`,
+              reason: 'ICP 画像中搜索查询包为空，获客引擎无法执行搜索。',
+              impact: '获客任务将无法发现潜在客户',
+              ctaLabel: '去完善',
+              ctaRoute: `knowledge-engine?productId=${product._id}&tab=icp`
+            });
+          }
+        }
+      }
+
+      // 2. 检查运行中的获客任务
+      const runningRuns = await LeadRunModel.find({ status: 'running' }).lean();
+      for (const run of runningRuns) {
+        const progress = run.progress?.total || 0;
+        if (progress < 100) {
+          actions.push({
+            id: `act-${actionId++}`,
+            type: '回执记录',
+            priority: 'P2',
+            status: '处理中',
+            sourceModule: '出海获客雷达',
+            title: `「${run.productName}」获客任务进行中 (${progress}%)`,
+            reason: '任务正在执行，请等待完成或查看进度。',
+            impact: '预计发现 ' + (run.targetCompanyCount || 30) + ' 家潜在客户',
+            ctaLabel: '查看进度',
+            ctaRoute: `outreach-radar?tab=runs&runId=${run._id}`
+          });
+        }
+      }
+
+      // 3. 检查高分未触达公司
+      const highValueCompanies = await CompanyModel.find({
+        'score.tier': { $in: ['Tier A (Critical Pain)', 'Tier B (Active Change)'] },
+        status: { $ne: 'outreached' }
+      }).limit(5).lean();
+
+      if (highValueCompanies.length > 0) {
+        actions.push({
+          id: `act-${actionId++}`,
+          type: '方向拍板',
+          priority: 'P1',
+          status: '待处理',
+          sourceModule: '出海获客雷达',
+          title: `${highValueCompanies.length} 家高价值线索待触达`,
+          reason: `发现 ${highValueCompanies.length} 家 Tier A/B 级线索尚未发送触达邮件。`,
+          impact: '高价值线索可能被竞争对手抢占',
+          required: highValueCompanies.slice(0, 3).map(c => c.name),
+          ctaLabel: '去触达',
+          ctaRoute: 'outreach-radar?tab=pool&filter=high-value'
+        });
+      }
+
+      // 4. 检查内容资产状态
+      const { ContentAsset: ContentAssetModel } = await import('./models/ContentAsset');
+      const draftContent = await ContentAssetModel.countDocuments({ status: 'draft' });
+      const optimizedContent = await ContentAssetModel.countDocuments({ status: 'optimized' });
+
+      if (optimizedContent > 0) {
+        actions.push({
+          id: `act-${actionId++}`,
+          type: '内容共创',
+          priority: 'P1',
+          status: '待处理',
+          sourceModule: '营销驱动系统',
+          title: `${optimizedContent} 篇内容待确认发布`,
+          reason: 'AI 已完成优化，等待人工确认后发布。',
+          impact: '尽早发布可提升 SEO 权重积累',
+          ctaLabel: '去确认',
+          ctaRoute: 'marketing-drive?filter=optimized'
+        });
+      }
+
+      if (draftContent > 0) {
+        actions.push({
+          id: `act-${actionId++}`,
+          type: '内容共创',
+          priority: 'P2',
+          status: '待处理',
+          sourceModule: '营销驱动系统',
+          title: `${draftContent} 篇草稿待优化`,
+          reason: '内容草稿已生成，需进行 SEO 优化。',
+          impact: '优化后预计 SEO 得分提升 30%+',
+          ctaLabel: '去优化',
+          ctaRoute: 'marketing-drive?filter=draft'
+        });
+      }
+
+      // 5. 检查社媒账号授权
+      const linkedAccounts = await SocialAccountModel.countDocuments({ status: 'active' });
+      if (linkedAccounts === 0) {
+        actions.push({
+          id: `act-${actionId++}`,
+          type: '授权接入',
+          priority: 'P1',
+          status: '待处理',
+          sourceModule: '海外声量中台',
+          title: '社媒账号未授权',
+          reason: '尚未连接任何社交媒体账号，无法发布内容。',
+          impact: '社媒矩阵功能暂不可用',
+          ctaLabel: '去授权',
+          ctaRoute: 'social-presence?action=connect'
+        });
+      }
+
+      // 按优先级排序
+      const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2 };
+      actions.sort((a, b) => priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]);
+
+      res.json(actions);
+    } catch (err: any) {
+      console.error('Client actions error:', err);
+      res.status(500).json({ error: 'Failed to generate client actions', details: err.message });
+    }
+  });
+
   // ==================== OAuth Placeholder Routes ====================
   app.get('/api/auth/x/authorize', (req, res) => {
     // TODO: Implement X OAuth 2.0 PKCE flow
@@ -2476,7 +3171,7 @@ All emails should cite specific evidence found about the company.`,
 
   // --- Keyword Clusters ---
 
-  // Extract keywords from ExportStrategy research data
+  // Extract keywords from ExportStrategy research data (legacy, kept for backward compatibility)
   app.post('/api/seo/keywords/extract', async (req, res) => {
     try {
       const { exportStrategy, productName } = req.body;
@@ -2561,6 +3256,182 @@ Return JSON array of clusters.`;
     }
   });
 
+  // NEW: ICP-Driven Keyword Extraction - generates keywords tailored to specific buyer personas
+  app.post('/api/seo/keywords/extract-icp', async (req, res) => {
+    try {
+      const { exportStrategy, icpProfile, productName } = req.body;
+      if (!exportStrategy && !icpProfile) {
+        return res.status(400).json({ error: 'Either exportStrategy or icpProfile is required' });
+      }
+
+      // Build ICP context for the prompt
+      const buyerPersonas = icpProfile?.buyerPersonas || [];
+      const painPoints = icpProfile?.painPoints || [];
+      const buyingTriggers = icpProfile?.buyingTriggers || [];
+      const industryTags = icpProfile?.industryTags || [];
+      const targetCustomerTypes = icpProfile?.targetCustomerTypes || [];
+
+      const prompt = `You are an expert SEO strategist specializing in B2B industrial products. Generate ICP-driven keyword clusters that target SPECIFIC buyer personas.
+
+=== PRODUCT CONTEXT ===
+Product: ${productName || exportStrategy?.productNameEN || 'Unknown'}
+English Name: ${exportStrategy?.productNameEN || ''}
+International Terms: ${(exportStrategy?.internationalTerms || []).join(', ')}
+Industry: ${exportStrategy?.industryCategory || industryTags.join(', ')}
+Competitors: ${(exportStrategy?.competitorAnalysis || []).map((c: any) => c.name).join(', ')}
+
+=== ICP (IDEAL CUSTOMER PROFILE) ===
+Target Industries: ${industryTags.join(', ')}
+Target Customer Types: ${targetCustomerTypes.join(', ')}
+Buyer Personas: ${buyerPersonas.map((bp: any) => `${bp.title} (${bp.role}) - concerns: ${(bp.concerns || []).join(', ')}`).join('; ')}
+Pain Points: ${painPoints.join(', ')}
+Buying Triggers: ${buyingTriggers.join(', ')}
+
+=== TASK ===
+Generate 4-6 keyword clusters. For EACH cluster, you must specify:
+
+1. name: Descriptive cluster name (in English)
+2. primaryKeyword: Main keyword with highest search potential
+3. relatedKeywords: 5-8 related keywords, each with:
+   - keyword, searchVolume (high/medium/low), competition (high/medium/low)
+   - searchIntent (informational/commercial/transactional/navigational)
+   - priority (0-100)
+4. primarySearchIntent: Dominant intent for this cluster
+5. targetPersona: Which buyer persona this cluster targets
+   - title: Job title (e.g., "Procurement Manager", "Technical Director")
+   - role: decision_maker / influencer / user / gatekeeper
+   - concerns: What they care about
+6. journeyStage: awareness / consideration / decision
+7. addressPainPoints: Which pain points this cluster addresses (from the list above)
+8. recommendedContentTypes: Best content formats for this cluster
+   - For informational intent → ["blog-article", "faq-page"]
+   - For commercial intent → ["case-study", "landing-page"]
+   - For transactional intent → ["landing-page", "technical-doc"]
+
+IMPORTANT RULES:
+- Each cluster should target a SPECIFIC persona (don't make generic clusters)
+- Match keywords to buyer journey stage:
+  - Awareness: "what is...", "how does...", "problems with..."
+  - Consideration: "best...", "compare...", "alternatives to...", "[product] vs..."
+  - Decision: "buy...", "price...", "supplier...", "quote..."
+- Address specific pain points in keyword selection
+- Generate clusters in English (for international SEO)
+
+Return a JSON array of clusters.`;
+
+      const { parsed: clusters } = await generateAIContent(prompt, {
+        responseSchema: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              primaryKeyword: { type: 'string' },
+              relatedKeywords: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    keyword: { type: 'string' },
+                    searchVolume: { type: 'string' },
+                    competition: { type: 'string' },
+                    searchIntent: { type: 'string' },
+                    priority: { type: 'number' }
+                  }
+                }
+              },
+              primarySearchIntent: { type: 'string' },
+              targetPersona: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  role: { type: 'string' },
+                  concerns: { type: 'array', items: { type: 'string' } }
+                }
+              },
+              journeyStage: { type: 'string' },
+              addressPainPoints: { type: 'array', items: { type: 'string' } },
+              recommendedContentTypes: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        },
+        temperature: 0.6
+      });
+
+      if (!clusters || clusters.length === 0) throw new Error('AI returned empty clusters');
+
+      // Helper function to recommend content types based on search intent
+      const getRecommendedContentTypes = (intent: string, aiRecommendations?: string[]): string[] => {
+        if (aiRecommendations && aiRecommendations.length > 0) return aiRecommendations;
+        switch (intent) {
+          case 'informational': return ['blog-article', 'faq-page'];
+          case 'commercial': return ['case-study', 'landing-page'];
+          case 'transactional': return ['landing-page', 'technical-doc'];
+          case 'navigational': return ['landing-page'];
+          default: return ['blog-article'];
+        }
+      };
+
+      // Save to DB with ICP-driven fields
+      const saved = [];
+      for (const c of clusters) {
+        const primaryIntent = ['informational', 'commercial', 'transactional', 'navigational'].includes(c.primarySearchIntent) 
+          ? c.primarySearchIntent : 'informational';
+        const journeyStage = ['awareness', 'consideration', 'decision'].includes(c.journeyStage)
+          ? c.journeyStage : 'awareness';
+        const personaRole = ['decision_maker', 'influencer', 'user', 'gatekeeper'].includes(c.targetPersona?.role)
+          ? c.targetPersona.role : 'influencer';
+
+        const cluster = await KeywordCluster.create({
+          name: c.name,
+          primaryKeyword: c.primaryKeyword,
+          relatedKeywords: (c.relatedKeywords || []).map((rk: any) => ({
+            keyword: rk.keyword,
+            searchVolume: ['high', 'medium', 'low'].includes(rk.searchVolume) ? rk.searchVolume : 'medium',
+            competition: ['high', 'medium', 'low'].includes(rk.competition) ? rk.competition : 'medium',
+            searchIntent: ['informational', 'commercial', 'transactional', 'navigational'].includes(rk.searchIntent) ? rk.searchIntent : 'informational',
+            priority: typeof rk.priority === 'number' ? Math.min(100, Math.max(0, rk.priority)) : 50
+          })),
+          source: 'icp-driven',
+          status: 'active',
+          // ICP-driven fields
+          primarySearchIntent: primaryIntent,
+          targetPersona: c.targetPersona ? {
+            title: c.targetPersona.title || 'Unknown',
+            role: personaRole,
+            concerns: c.targetPersona.concerns || []
+          } : undefined,
+          journeyStage: journeyStage,
+          addressPainPoints: c.addressPainPoints || [],
+          recommendedContentTypes: getRecommendedContentTypes(primaryIntent, c.recommendedContentTypes)
+        });
+        saved.push({ ...cluster.toObject(), id: cluster._id.toString() });
+      }
+
+      res.json({ 
+        clusters: saved, 
+        count: saved.length,
+        icpDriven: true,
+        summary: {
+          byJourneyStage: {
+            awareness: saved.filter(c => c.journeyStage === 'awareness').length,
+            consideration: saved.filter(c => c.journeyStage === 'consideration').length,
+            decision: saved.filter(c => c.journeyStage === 'decision').length
+          },
+          byPersonaRole: {
+            decision_maker: saved.filter(c => c.targetPersona?.role === 'decision_maker').length,
+            influencer: saved.filter(c => c.targetPersona?.role === 'influencer').length,
+            user: saved.filter(c => c.targetPersona?.role === 'user').length,
+            gatekeeper: saved.filter(c => c.targetPersona?.role === 'gatekeeper').length
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error('[SEO Keywords Extract ICP] Error:', err);
+      res.status(500).json({ error: 'ICP-driven keyword extraction failed', details: err.message });
+    }
+  });
+
   // Get all keyword clusters
   app.get('/api/seo/keywords/clusters', async (req, res) => {
     try {
@@ -2623,7 +3494,10 @@ Return JSON array of clusters.`;
   // Create content plan
   app.post('/api/seo/content-plans', async (req, res) => {
     try {
-      const { keywordClusterId, contentType, targetKeywords, title, scheduledDate, priority, assignedKnowledgeCards, outline, notes } = req.body;
+      const { keywordClusterId, contentType, targetKeywords, title, scheduledDate, priority, assignedKnowledgeCards, outline, notes,
+        // ICP-driven fields
+        targetPersona, journeyStage, addressPainPoints, recommendedContentType, contentTone, icpContext
+      } = req.body;
       if (!title || !contentType) return res.status(400).json({ error: 'title and contentType are required' });
 
       const plan = await ContentPlan.create({
@@ -2636,11 +3510,173 @@ Return JSON array of clusters.`;
         status: 'planned',
         assignedKnowledgeCards: assignedKnowledgeCards || [],
         outline: outline || [],
-        notes
+        notes,
+        // ICP-driven fields
+        targetPersona,
+        journeyStage,
+        addressPainPoints,
+        recommendedContentType,
+        contentTone,
+        icpContext
       });
       res.json({ ...plan.toObject(), id: plan._id.toString() });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to create content plan', details: err.message });
+    }
+  });
+
+  // NEW: Auto-generate content plans from keyword clusters with ICP context
+  app.post('/api/seo/content-plans/auto-generate', async (req, res) => {
+    try {
+      const { clusterIds, icpProfile } = req.body;
+      if (!clusterIds || clusterIds.length === 0) {
+        return res.status(400).json({ error: 'clusterIds array is required' });
+      }
+
+      // Fetch keyword clusters
+      const clusters = await KeywordCluster.find({ _id: { $in: clusterIds } });
+      if (clusters.length === 0) {
+        return res.status(404).json({ error: 'No keyword clusters found' });
+      }
+
+      // Content type recommendation logic based on search intent and journey stage
+      const getRecommendedContentType = (intent?: string, journeyStage?: string): string => {
+        // Journey stage takes precedence
+        if (journeyStage) {
+          switch (journeyStage) {
+            case 'awareness': return 'blog-article';
+            case 'consideration': return 'case-study';
+            case 'decision': return 'landing-page';
+          }
+        }
+        // Fallback to intent-based
+        switch (intent) {
+          case 'informational': return 'blog-article';
+          case 'commercial': return 'case-study';
+          case 'transactional': return 'landing-page';
+          case 'navigational': return 'landing-page';
+          default: return 'blog-article';
+        }
+      };
+
+      // Priority logic based on persona role and journey stage
+      const getRecommendedPriority = (personaRole?: string, journeyStage?: string): string => {
+        // Decision makers at decision stage = highest priority
+        if (personaRole === 'decision_maker' && journeyStage === 'decision') return 'P0';
+        if (personaRole === 'decision_maker') return 'P1';
+        if (journeyStage === 'decision') return 'P1';
+        return 'P2';
+      };
+
+      // Content tone based on persona role
+      const getContentTone = (personaRole?: string): string => {
+        switch (personaRole) {
+          case 'decision_maker': return 'business';
+          case 'influencer': return 'technical';
+          case 'user': return 'educational';
+          case 'gatekeeper': return 'persuasive';
+          default: return 'educational';
+        }
+      };
+
+      // Generate AI-assisted titles for each cluster
+      const titlePrompt = `Generate SEO-optimized article titles for these keyword clusters. For each cluster, provide a compelling title in English that:
+1. Contains the primary keyword naturally
+2. Appeals to the target persona
+3. Addresses the pain points
+4. Is appropriate for the content type
+
+Clusters:
+${clusters.map((c: any, i: number) => `
+${i + 1}. Cluster: "${c.name}"
+   Primary Keyword: "${c.primaryKeyword}"
+   Target Persona: ${c.targetPersona?.title || 'General B2B buyer'}
+   Journey Stage: ${c.journeyStage || 'awareness'}
+   Pain Points: ${(c.addressPainPoints || []).join(', ') || 'N/A'}
+   Content Type: ${getRecommendedContentType(c.primarySearchIntent, c.journeyStage)}
+`).join('\n')}
+
+Return a JSON array with objects containing:
+- clusterId (use the index 0, 1, 2...)
+- title (the generated title)
+- outline (array of 3-5 section headings)`;
+
+      const { parsed: titleResults } = await generateAIContent(titlePrompt, {
+        responseSchema: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              clusterId: { type: 'number' },
+              title: { type: 'string' },
+              outline: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        },
+        temperature: 0.7
+      });
+
+      // Create content plans for each cluster
+      const plans = [];
+      for (let i = 0; i < clusters.length; i++) {
+        const cluster: any = clusters[i];
+        const titleResult = titleResults?.find((t: any) => t.clusterId === i);
+        
+        const contentType = getRecommendedContentType(cluster.primarySearchIntent, cluster.journeyStage);
+        const priority = getRecommendedPriority(cluster.targetPersona?.role, cluster.journeyStage);
+        const tone = getContentTone(cluster.targetPersona?.role);
+
+        const plan = await ContentPlan.create({
+          keywordClusterId: cluster._id,
+          contentType,
+          targetKeywords: [cluster.primaryKeyword, ...(cluster.relatedKeywords || []).slice(0, 3).map((rk: any) => rk.keyword)],
+          title: titleResult?.title || `${cluster.name} - ${cluster.primaryKeyword}`,
+          priority,
+          status: 'planned',
+          assignedKnowledgeCards: [],
+          outline: titleResult?.outline || [],
+          // ICP-driven fields
+          targetPersona: cluster.targetPersona,
+          journeyStage: cluster.journeyStage,
+          addressPainPoints: cluster.addressPainPoints,
+          recommendedContentType: contentType,
+          contentTone: tone,
+          icpContext: icpProfile ? {
+            industryTags: icpProfile.industryTags,
+            buyingTriggers: icpProfile.buyingTriggers,
+            disqualifiers: icpProfile.disqualifiers
+          } : undefined
+        });
+
+        plans.push({ ...plan.toObject(), id: plan._id.toString() });
+      }
+
+      res.json({
+        plans,
+        count: plans.length,
+        summary: {
+          byContentType: {
+            'blog-article': plans.filter(p => p.contentType === 'blog-article').length,
+            'case-study': plans.filter(p => p.contentType === 'case-study').length,
+            'landing-page': plans.filter(p => p.contentType === 'landing-page').length,
+            'faq-page': plans.filter(p => p.contentType === 'faq-page').length,
+            'technical-doc': plans.filter(p => p.contentType === 'technical-doc').length
+          },
+          byPriority: {
+            P0: plans.filter(p => p.priority === 'P0').length,
+            P1: plans.filter(p => p.priority === 'P1').length,
+            P2: plans.filter(p => p.priority === 'P2').length
+          },
+          byJourneyStage: {
+            awareness: plans.filter(p => p.journeyStage === 'awareness').length,
+            consideration: plans.filter(p => p.journeyStage === 'consideration').length,
+            decision: plans.filter(p => p.journeyStage === 'decision').length
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error('[Content Plans Auto-Generate] Error:', err);
+      res.status(500).json({ error: 'Failed to auto-generate content plans', details: err.message });
     }
   });
 
@@ -2685,15 +3721,99 @@ Return JSON array of clusters.`;
 
   // --- Content Assets (SEO Content) ---
 
-  // SEO-enhanced content generation
+  // SEO-enhanced content generation with ICP context
   app.post('/api/seo/content/generate', async (req, res) => {
     try {
-      const { contentPlanId, contentType, targetKeywords, focusKeyword, knowledgeCards, language = 'en', title } = req.body;
+      const { 
+        contentPlanId, contentType, targetKeywords, focusKeyword, knowledgeCards, language = 'en', title,
+        // ICP-driven parameters
+        targetPersona, journeyStage, addressPainPoints, contentTone, icpContext
+      } = req.body;
       if (!targetKeywords || targetKeywords.length === 0) return res.status(400).json({ error: 'targetKeywords are required' });
+
+      // If contentPlanId provided, fetch ICP context from the plan
+      let planIcpContext = null;
+      if (contentPlanId) {
+        const plan: any = await ContentPlan.findById(contentPlanId);
+        if (plan) {
+          planIcpContext = {
+            targetPersona: plan.targetPersona,
+            journeyStage: plan.journeyStage,
+            addressPainPoints: plan.addressPainPoints,
+            contentTone: plan.contentTone,
+            icpContext: plan.icpContext
+          };
+        }
+      }
+
+      // Merge ICP context (request params override plan context)
+      const finalTargetPersona = targetPersona || planIcpContext?.targetPersona;
+      const finalJourneyStage = journeyStage || planIcpContext?.journeyStage;
+      const finalPainPoints = addressPainPoints || planIcpContext?.addressPainPoints || [];
+      const finalContentTone = contentTone || planIcpContext?.contentTone;
+      const finalIcpContext = icpContext || planIcpContext?.icpContext;
 
       const cardContext = knowledgeCards
         ? `\n\nKnowledge Source Data:\n${JSON.stringify(knowledgeCards, null, 2)}`
         : '';
+
+      // Build ICP context section for the prompt
+      const icpSection = finalTargetPersona ? `
+=== TARGET READER PROFILE (ICP) ===
+Target Persona: ${finalTargetPersona.title} (${finalTargetPersona.role})
+Their Concerns: ${(finalTargetPersona.concerns || []).join(', ')}
+Buyer Journey Stage: ${finalJourneyStage || 'consideration'}
+Pain Points to Address: ${finalPainPoints.join(', ')}
+Content Tone: ${finalContentTone || 'professional'}
+${finalIcpContext?.industryTags ? `Target Industries: ${finalIcpContext.industryTags.join(', ')}` : ''}
+${finalIcpContext?.buyingTriggers ? `Buying Triggers: ${finalIcpContext.buyingTriggers.join(', ')}` : ''}
+
+IMPORTANT PERSONA-SPECIFIC INSTRUCTIONS:
+${finalTargetPersona.role === 'decision_maker' ? `
+- Focus on ROI, business value, and strategic benefits
+- Include cost-benefit analysis and competitive advantages
+- Use executive-friendly language, avoid excessive jargon
+- Emphasize risk mitigation and compliance
+` : ''}
+${finalTargetPersona.role === 'influencer' ? `
+- Focus on technical specifications and performance data
+- Include comparison with alternatives and technical benchmarks
+- Use industry-standard terminology
+- Emphasize innovation and technical capabilities
+` : ''}
+${finalTargetPersona.role === 'user' ? `
+- Focus on practical benefits and ease of use
+- Include step-by-step processes and use cases
+- Use clear, accessible language
+- Emphasize productivity gains and problem-solving
+` : ''}
+${finalTargetPersona.role === 'gatekeeper' ? `
+- Focus on vendor credibility and support capabilities
+- Include certifications, references, and case studies
+- Use professional, trust-building language
+- Emphasize reliability and service quality
+` : ''}
+
+JOURNEY STAGE FOCUS:
+${finalJourneyStage === 'awareness' ? `
+- Educate about the problem/opportunity
+- Establish thought leadership
+- Avoid heavy product promotion
+- Focus on industry trends and challenges
+` : ''}
+${finalJourneyStage === 'consideration' ? `
+- Compare solutions and approaches
+- Highlight differentiators
+- Include case studies and social proof
+- Address common objections
+` : ''}
+${finalJourneyStage === 'decision' ? `
+- Provide clear call-to-action
+- Include pricing considerations
+- Emphasize implementation support
+- Reduce friction to purchase
+` : ''}
+` : '';
 
       const contentTypeLabel = contentType === 'landing-page' ? 'SEO Landing Page'
         : contentType === 'blog-article' ? 'SEO Blog Article'
@@ -2702,25 +3822,27 @@ Return JSON array of clusters.`;
         : contentType === 'technical-doc' ? 'Technical Document'
         : 'SEO Article';
 
-      const prompt = `You are a world-class B2B SEO content writer. Generate a complete ${contentTypeLabel} optimized for the following keywords.
+      const prompt = `You are a world-class B2B SEO content writer specializing in creating persona-targeted content. Generate a complete ${contentTypeLabel} optimized for the following keywords AND tailored to the specific reader profile.
 
 FOCUS KEYWORD: ${focusKeyword || targetKeywords[0]}
 SECONDARY KEYWORDS: ${targetKeywords.slice(1).join(', ')}
 CONTENT TYPE: ${contentTypeLabel}
 LANGUAGE: ${language === 'en' ? 'English' : language === 'zh' ? 'Chinese' : language}
 ${title ? `SUGGESTED TITLE: ${title}` : ''}
+${icpSection}
 ${cardContext}
 
 SEO REQUIREMENTS:
-1. Title (H1): Include focus keyword naturally, 50-60 characters
+1. Title (H1): Include focus keyword naturally, 50-60 characters, appeal to target persona
 2. Meta Title: Include focus keyword, max 60 characters
-3. Meta Description: Include focus keyword, compelling CTA, 150-160 characters
+3. Meta Description: Include focus keyword, compelling CTA for target persona, 150-160 characters
 4. Body Structure: Use H2/H3 hierarchy, include focus keyword in first 100 words
 5. Keyword Density: Focus keyword 1-2%, secondary keywords 0.5-1% each
 6. Internal linking opportunities: Suggest 3-5 anchor text + topic pairs
 7. Word Count: 1500-2500 words for blog, 800-1200 for landing page
-8. Include a compelling introduction and conclusion with CTA
+8. Include a compelling introduction and conclusion with CTA appropriate for journey stage
 9. If knowledge card data is insufficient, mark placeholders as [TO BE FILLED: description]
+10. CRITICAL: Address the specified pain points naturally throughout the content
 
 ${contentType === 'faq-page' ? 'Generate 8-12 FAQ items with concise answers optimized for featured snippets and voice search.' : ''}
 
@@ -2737,7 +3859,8 @@ Return structured JSON.`;
             headings: { type: 'array', items: { type: 'object', properties: { level: { type: 'string' }, text: { type: 'string' } } } },
             internalLinkSuggestions: { type: 'array', items: { type: 'object', properties: { anchorText: { type: 'string' }, targetTopic: { type: 'string' } } } },
             missingInfoNeeded: { type: 'array', items: { type: 'string' } },
-            wordCount: { type: 'number' }
+            wordCount: { type: 'number' },
+            personaRelevanceScore: { type: 'number', description: '0-100 how well content addresses target persona' }
           },
           required: ['title', 'body', 'metaTitle', 'metaDescription']
         },
@@ -2747,7 +3870,7 @@ Return structured JSON.`;
 
       if (!result) throw new Error('AI returned empty content');
 
-      // Persist ContentAsset
+      // Persist ContentAsset with ICP metadata
       const asset = await ContentAsset.create({
         contentPlanId,
         title: result.title,
@@ -2763,8 +3886,17 @@ Return structured JSON.`;
         version: 1,
         status: 'draft',
         category: contentType || 'blog-article',
-        keywords: targetKeywords
+        keywords: targetKeywords,
+        // ICP metadata for traceability
+        icpMetadata: finalTargetPersona ? {
+          targetPersona: finalTargetPersona,
+          journeyStage: finalJourneyStage,
+          addressPainPoints: finalPainPoints,
+          contentTone: finalContentTone
+        } : undefined
       });
+
+      if (!asset) throw new Error('Failed to create content asset');
 
       // Update content plan status if linked
       if (contentPlanId) {
@@ -2777,6 +3909,8 @@ Return structured JSON.`;
         headings: result.headings,
         internalLinkSuggestions: result.internalLinkSuggestions,
         wordCount: result.wordCount,
+        personaRelevanceScore: result.personaRelevanceScore,
+        icpDriven: !!finalTargetPersona,
         _generated: true
       });
     } catch (err: any) {

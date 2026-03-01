@@ -287,3 +287,90 @@ export const productResearchSchema = {
   },
   required: ['productNameEN', 'productNameCN', 'marketPositioning', 'certifications', 'channels', 'differentiationStrategy', 'actionItems']
 };
+
+// Schema for website analysis / lead qualification
+export const websiteAnalysisSchema = {
+  type: 'object',
+  properties: {
+    qualification: { type: 'string', description: 'QUALIFIED, MAYBE, or DISQUALIFIED' },
+    qualificationReason: { type: 'string', description: 'Concise explanation (50-150 chars) of why this company is qualified/disqualified' },
+    relevanceScore: { type: 'number', description: 'Overall relevance score 0-100' },
+    products: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Product or service name' },
+          description: { type: 'string', description: 'Brief description' }
+        },
+        required: ['name']
+      },
+      description: 'Products/services this company offers'
+    },
+    equipment: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', description: 'Equipment type, e.g. manual paint line, CNC machine' },
+          brand: { type: 'string', description: 'Brand name if mentioned' },
+          context: { type: 'string', description: 'Context where mentioned' }
+        },
+        required: ['type']
+      },
+      description: 'Equipment/machinery mentioned on the website'
+    },
+    technologies: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Technologies, processes, or standards mentioned'
+    },
+    companySize: {
+      type: 'object',
+      properties: {
+        employees: { type: 'string', description: 'Employee count or range if mentioned' },
+        facilities: { type: 'string', description: 'Production facilities description' },
+        indicators: { type: 'array', items: { type: 'string' }, description: 'Other size indicators' }
+      }
+    },
+    breakdown: {
+      type: 'object',
+      properties: {
+        industryMatch: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100 how well this company matches target industries' },
+            reasoning: { type: 'string' }
+          },
+          required: ['score', 'reasoning']
+        },
+        businessRelevance: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100 how relevant their business is to our product' },
+            reasoning: { type: 'string' }
+          },
+          required: ['score', 'reasoning']
+        },
+        sizeMatch: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100 how well company size fits' },
+            reasoning: { type: 'string' }
+          },
+          required: ['score', 'reasoning']
+        },
+        technologyGap: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100 likelihood of technology upgrade needs' },
+            reasoning: { type: 'string' }
+          },
+          required: ['score', 'reasoning']
+        }
+      },
+      required: ['industryMatch', 'businessRelevance', 'sizeMatch', 'technologyGap']
+    }
+  },
+  required: ['qualification', 'qualificationReason', 'relevanceScore', 'products', 'breakdown']
+};

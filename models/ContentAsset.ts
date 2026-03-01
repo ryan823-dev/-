@@ -37,6 +37,18 @@ export interface IPublishedChannel {
   publishedAt: Date;
 }
 
+// ICP metadata for content traceability
+export interface IICPMetadata {
+  targetPersona?: {
+    title: string;
+    role: 'decision_maker' | 'influencer' | 'user' | 'gatekeeper';
+    concerns: string[];
+  };
+  journeyStage?: 'awareness' | 'consideration' | 'decision';
+  addressPainPoints?: string[];
+  contentTone?: 'technical' | 'business' | 'educational' | 'persuasive';
+}
+
 export interface IContentAsset extends Document {
   contentPlanId?: Types.ObjectId;
   
@@ -72,6 +84,9 @@ export interface IContentAsset extends Document {
   status: ContentAssetStatus;
   publishedAt?: Date;
   publishedChannels?: IPublishedChannel[];
+  
+  // ICP metadata (new)
+  icpMetadata?: IICPMetadata;
   
   // Legacy compatibility
   category?: string;
@@ -121,6 +136,19 @@ const PublishedChannelSchema = new Schema<IPublishedChannel>({
   publishedAt: { type: Date, default: Date.now }
 }, { _id: false });
 
+const ICPMetadataSchema = new Schema<IICPMetadata>({
+  targetPersona: {
+    type: new Schema({
+      title: { type: String },
+      role: { type: String, enum: ['decision_maker', 'influencer', 'user', 'gatekeeper'] },
+      concerns: [{ type: String }]
+    }, { _id: false })
+  },
+  journeyStage: { type: String, enum: ['awareness', 'consideration', 'decision'] },
+  addressPainPoints: [{ type: String }],
+  contentTone: { type: String, enum: ['technical', 'business', 'educational', 'persuasive'] }
+}, { _id: false });
+
 const ContentAssetSchema = new Schema<IContentAsset>({
   contentPlanId: { type: Schema.Types.ObjectId, ref: 'ContentPlan' },
   
@@ -164,6 +192,9 @@ const ContentAssetSchema = new Schema<IContentAsset>({
   },
   publishedAt: { type: Date },
   publishedChannels: [PublishedChannelSchema],
+  
+  // ICP metadata (new)
+  icpMetadata: { type: ICPMetadataSchema },
   
   // Legacy compatibility with existing frontend
   category: { type: String },

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { knowledgeCards as initialCards } from '../lib/mock';
 import { KnowledgeCard } from '../types';
 import { NavItem } from '../types';
 import { useToast } from './Toast';
@@ -52,8 +51,10 @@ import {
   Globe2,
   Users,
   Trophy,
-  BookOpen
+  BookOpen,
+  Library
 } from 'lucide-react';
+import ModuleHeader from './ModuleHeader';
 
 // 支持的文件格�?
 const SUPPORTED_FORMATS = {
@@ -215,8 +216,26 @@ const KnowledgeEngine: React.FC<KnowledgeEngineProps> = ({ onNavigate }) => {
   
   // Restore persisted state from localStorage
   const [cards, setCards] = useState<KnowledgeCard[]>(() => {
-    try { const s = localStorage.getItem('vtx_ke_cards'); return s ? JSON.parse(s) : initialCards; } catch { return initialCards; }
+    try { const s = localStorage.getItem('vtx_ke_cards'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
+
+  // Fetch knowledge cards from API on mount
+  useEffect(() => {
+    fetch('/api/knowledge-cards')
+      .then(res => res.ok ? res.json() : [])
+      .then(apiCards => {
+        if (Array.isArray(apiCards) && apiCards.length > 0) {
+          setCards(prev => {
+            // Merge: API cards + any user-added cards not in API
+            const safePrev = Array.isArray(prev) ? prev : [];
+            const apiIds = new Set(apiCards.map((c: KnowledgeCard) => c.id));
+            const userCards = safePrev.filter(c => !apiIds.has(c.id) && !c.id.startsWith('product-') && !c.id.startsWith('icp-') && c.id !== 'company-profile');
+            return [...apiCards, ...userCards];
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [sources, setSources] = useState<KnowledgeSource[]>(() => {
     try { const s = localStorage.getItem('vtx_ke_sources'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -823,18 +842,7 @@ const KnowledgeEngine: React.FC<KnowledgeEngineProps> = ({ onNavigate }) => {
       {!isEmpty && (
         <>
           {/* 标题区 */}
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-navy-900 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center">
-                  <Database size={20} className="text-white" />
-                </div>
-                专业知识库
-              </h2>
-              <p className="text-slate-500 text-sm mt-2 ml-[52px]">
-                上传企业资料，AI 自动提炼核心信息，为海外营销内容提供素材支撑
-              </p>
-            </div>
+          <ModuleHeader icon={Library} title="专业知识引擎" subtitle="上传企业资料，AI 自动提炼核心信息，为海外营销提供素材支撑">
             <div className="flex gap-3">
               <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -855,7 +863,7 @@ const KnowledgeEngine: React.FC<KnowledgeEngineProps> = ({ onNavigate }) => {
                 <Globe size={14} className="text-gold" /> 网页提取
               </button>
             </div>
-          </div>
+          </ModuleHeader>
 
           {/* 统计仪表板 - 可点击的功能入口 */}
           <div className="grid grid-cols-4 gap-5 animate-in fade-in duration-300">

@@ -27,6 +27,7 @@ export interface ILeadRun extends Document {
   status: RunStatus;
   progress: {
     discovery: number;
+    websiteAnalysis: number;
     enrichment: number;
     contact: number;
     research: number;
@@ -74,6 +75,7 @@ const LeadRunSchema = new Schema<ILeadRun>({
   },
   progress: {
     discovery: { type: Number, default: 0 },
+    websiteAnalysis: { type: Number, default: 0 },
     enrichment: { type: Number, default: 0 },
     contact: { type: Number, default: 0 },
     research: { type: Number, default: 0 },

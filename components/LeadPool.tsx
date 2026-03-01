@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Company } from '../types';
-import { Search, Filter, Download, ExternalLink, ChevronRight, ChevronDown, ChevronUp, Globe, Building2, FileText, Mail, Linkedin, Users, Zap, AlertTriangle, TrendingUp, X } from 'lucide-react';
+import { Search, Filter, Download, ExternalLink, ChevronRight, ChevronDown, ChevronUp, Globe, Building2, FileText, Mail, Linkedin, Users, Zap, AlertTriangle, TrendingUp, X, ShieldCheck, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 
 interface LeadPoolProps {
   onSelectCompany: (id: string) => void;
@@ -8,6 +8,7 @@ interface LeadPoolProps {
 
 type FilterTier = 'all' | 'A' | 'B' | 'C' | 'D';
 type FilterStatus = 'all' | 'discovered' | 'scored' | 'outreached';
+type FilterQualification = 'all' | 'qualified' | 'maybe' | 'disqualified';
 
 const STATUS_LABELS: Record<string, string> = {
   discovered: '已发现',
@@ -23,6 +24,7 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTier, setFilterTier] = useState<FilterTier>('all');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [filterQualification, setFilterQualification] = useState<FilterQualification>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -47,8 +49,9 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
     
     const matchTier = filterTier === 'all' || c.score?.tier?.includes(`Tier ${filterTier}`);
     const matchStatus = filterStatus === 'all' || c.status === filterStatus;
+    const matchQualification = filterQualification === 'all' || c.websiteAnalysis?.status === filterQualification;
     
-    return matchSearch && matchTier && matchStatus;
+    return matchSearch && matchTier && matchStatus && matchQualification;
   });
 
   // Sort: Tier A first, then B, C, D; within same tier sort by score desc
@@ -91,13 +94,15 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Company', 'Industry', 'Country', 'Tier', 'Score', 'Status', 'Contacts', 'Website'];
+    const headers = ['Company', 'Industry', 'Country', 'Tier', 'Score', 'Qualification', 'RelevanceScore', 'Status', 'Contacts', 'Website'];
     const rows = sortedCompanies.map(c => [
       c.name,
       c.industry || '',
       c.country || '',
       c.score?.tier?.split(' ')[1] || 'D',
       c.score?.total?.toString() || '0',
+      c.websiteAnalysis?.status || '',
+      c.websiteAnalysis?.relevanceScore?.toString() || '',
       c.status,
       (c as any).contacts?.length?.toString() || '0',
       c.website || ''
@@ -179,9 +184,19 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
           <option value="scored">已评分</option>
           <option value="outreached">已建联</option>
         </select>
-        {(filterTier !== 'all' || filterStatus !== 'all' || searchTerm) && (
+        <select
+          value={filterQualification}
+          onChange={e => setFilterQualification(e.target.value as FilterQualification)}
+          className="px-6 py-4 bg-white border border-border rounded-2xl text-sm font-bold text-navy-900 outline-none"
+        >
+          <option value="all">全部验证</option>
+          <option value="qualified">已认证</option>
+          <option value="maybe">待确认</option>
+          <option value="disqualified">已排除</option>
+        </select>
+        {(filterTier !== 'all' || filterStatus !== 'all' || filterQualification !== 'all' || searchTerm) && (
           <button 
-            onClick={() => { setFilterTier('all'); setFilterStatus('all'); setSearchTerm(''); }}
+            onClick={() => { setFilterTier('all'); setFilterStatus('all'); setFilterQualification('all'); setSearchTerm(''); }}
             className="px-4 py-4 text-xs font-bold text-slate-400 hover:text-navy-900 transition-all flex items-center gap-1"
           >
             <X size={14} /> 清除筛选
@@ -238,6 +253,37 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
                     </p>
                   </div>
 
+                  {/* Website Qualification */}
+                  <div className="w-24 shrink-0 text-center">
+                    {company.websiteAnalysis && company.websiteAnalysis.status !== 'pending' ? (
+                      <div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold uppercase border ${
+                          company.websiteAnalysis.status === 'qualified' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                          company.websiteAnalysis.status === 'maybe' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                          company.websiteAnalysis.status === 'disqualified' ? 'bg-red-50 text-red-500 border-red-100' :
+                          'bg-slate-50 text-slate-400 border-slate-100'
+                        }`}>
+                          {company.websiteAnalysis.status === 'qualified' ? <CheckCircle2 size={10} /> :
+                           company.websiteAnalysis.status === 'maybe' ? <HelpCircle size={10} /> :
+                           <AlertCircle size={10} />}
+                          {company.websiteAnalysis.status === 'qualified' ? 'Q' :
+                           company.websiteAnalysis.status === 'maybe' ? 'M' :
+                           company.websiteAnalysis.status === 'disqualified' ? 'DQ' :
+                           company.websiteAnalysis.status.charAt(0).toUpperCase()}
+                        </span>
+                        <p className={`text-[9px] font-bold mt-1 ${
+                          company.websiteAnalysis.relevanceScore >= 70 ? 'text-emerald-600' :
+                          company.websiteAnalysis.relevanceScore >= 40 ? 'text-amber-600' :
+                          'text-red-500'
+                        }`}>
+                          {company.websiteAnalysis.relevanceScore}分
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-slate-300">--</span>
+                    )}
+                  </div>
+
                   {/* Status */}
                   <div className="w-24 shrink-0">
                     <span className={`inline-flex px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
@@ -278,7 +324,7 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
                       <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
                     ) : detailData ? (
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Column 1: Company Info */}
+                        {/* Column 1: Company Info + Website Analysis */}
                         <div className="space-y-4">
                           <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">公司信息</h4>
                           <div className="space-y-2 text-sm">
@@ -303,6 +349,38 @@ const LeadPool: React.FC<LeadPoolProps> = ({ onSelectCompany }) => {
                               </div>
                             )}
                           </div>
+
+                          {/* Website Analysis Summary */}
+                          {detailData.websiteAnalysis && detailData.websiteAnalysis.status !== 'pending' && (
+                            <div className={`rounded-xl p-4 border ${
+                              detailData.websiteAnalysis.status === 'qualified' ? 'bg-emerald-50 border-emerald-100' :
+                              detailData.websiteAnalysis.status === 'maybe' ? 'bg-amber-50 border-amber-100' :
+                              detailData.websiteAnalysis.status === 'disqualified' ? 'bg-red-50 border-red-100' :
+                              'bg-slate-50 border-slate-100'
+                            }`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                  <ShieldCheck size={12} />
+                                  网站验证
+                                </p>
+                                <span className={`text-lg font-black font-mono ${
+                                  detailData.websiteAnalysis.relevanceScore >= 70 ? 'text-emerald-600' :
+                                  detailData.websiteAnalysis.relevanceScore >= 40 ? 'text-amber-600' :
+                                  'text-red-500'
+                                }`}>
+                                  {detailData.websiteAnalysis.relevanceScore}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-relaxed">{detailData.websiteAnalysis.qualificationReason}</p>
+                              {detailData.websiteAnalysis.products?.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {detailData.websiteAnalysis.products.slice(0, 4).map((p: any, i: number) => (
+                                    <span key={i} className="px-1.5 py-0.5 bg-white/60 text-slate-700 rounded text-[9px] font-medium">{p.name}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Column 2: Signals & Score */}

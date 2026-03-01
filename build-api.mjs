@@ -21,6 +21,8 @@ await build({
     'node-cron',
     'googleapis',
     'vite',
+    'cheerio',
+    'multer',
   ],
   banner: {
     js: [

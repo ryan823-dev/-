@@ -26,8 +26,10 @@ import {
   RefreshCw,
   ArrowUpRight,
   Timer,
-  XCircle
+  XCircle,
+  ClipboardList
 } from 'lucide-react';
+import ModuleHeader from './ModuleHeader';
 
 type TabId = 'overview' | 'review' | 'todo' | 'receipts' | 'push-tracking';
 
@@ -205,23 +207,17 @@ const PromotionHub: React.FC<PromotionHubProps> = ({ actions, assets, onNavigate
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-navy-900 tracking-tight">出海推进中台</h2>
-          <p className="text-slate-500 text-sm mt-1 font-medium">甲方协作与拍板入口：汇总推进事项，加速出海进程。</p>
-        </div>
-        <div className="flex gap-4">
-          <div className="bg-white px-5 py-3 rounded-2xl border border-border shadow-sm flex items-center gap-4 hover:border-gold/30 transition-colors">
-             <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                <ShieldCheck size={20} className="text-gold" />
-             </div>
-             <div className="flex flex-col justify-center">
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">推进权限</p>
-               <p className="text-xs font-bold text-navy-900 mt-0.5">甲方负责人 (Gold Tier)</p>
-             </div>
+      <ModuleHeader icon={ClipboardList} title="出海推进中台" subtitle="汇总推进事项，协作拍板，加速出海进程">
+        <div className="bg-white px-5 py-3 rounded-2xl border border-border shadow-sm flex items-center gap-4 hover:border-gold/30 transition-colors">
+          <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+            <ShieldCheck size={20} className="text-gold" />
+          </div>
+          <div className="flex flex-col justify-center">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">推进权限</p>
+            <p className="text-xs font-bold text-navy-900 mt-0.5">甲方负责人 (Gold Tier)</p>
           </div>
         </div>
-      </div>
+      </ModuleHeader>
 
       <div className="flex border-b border-border gap-10">
         {tabs.map((tab) => (

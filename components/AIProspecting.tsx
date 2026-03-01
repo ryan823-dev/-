@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import ProductModeling from './ProductModeling';
 import LeadRuns from './LeadRuns';
 import LeadPool from './LeadPool';
+import ModuleHeader from './ModuleHeader';
 import { Radar, Target, Play, Database } from 'lucide-react';
 
 type TabId = 'icp' | 'runs' | 'pool';
@@ -22,12 +23,11 @@ const AIProspecting: React.FC<AIProspectingProps> = ({ onSelectCompany }) => {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-navy-900">出海获客雷达</h2>
-          <p className="text-slate-500 text-sm">全自动海外市场扫描、背景穿透与精准建联。</p>
-        </div>
-      </div>
+      <ModuleHeader 
+        icon={Radar} 
+        title="出海获客雷达" 
+        subtitle="全自动海外市场扫描、背景穿透与精准建联" 
+      />
 
       <div className="flex border-b border-border gap-10">
         {tabs.map((tab) => (

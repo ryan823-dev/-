@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { knowledgeCards } from '../lib/mock';
 import { ContentAsset, KnowledgeCard, KeywordClusterFE, ContentPlanFE, DerivedContentFE } from '../types';
 import { useToast } from './Toast';
 import {
@@ -36,6 +35,7 @@ import {
   FileEdit,
   ArrowRight
 } from 'lucide-react';
+import ModuleHeader from './ModuleHeader';
 
 // ==================== Types ====================
 
@@ -73,6 +73,7 @@ const MarketingDrive: React.FC<MarketingDriveProps> = ({ onNewAssetGenerated, as
   const [clusters, setClusters] = useState<KeywordClusterFE[]>([]);
   const [plans, setPlans] = useState<ContentPlanFE[]>([]);
   const [contentAssets, setContentAssets] = useState<any[]>([]);
+  const [knowledgeCards, setKnowledgeCards] = useState<KnowledgeCard[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch SEO stats
@@ -107,21 +108,26 @@ const MarketingDrive: React.FC<MarketingDriveProps> = ({ onNewAssetGenerated, as
     } catch { /* silent */ }
   }, []);
 
+  // Fetch knowledge cards from API
+  const fetchKnowledgeCards = useCallback(async () => {
+    try {
+      const res = await fetch('/api/knowledge-cards');
+      if (res.ok) setKnowledgeCards(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     fetchClusters();
     fetchPlans();
     fetchContentAssets();
-  }, [fetchStats, fetchClusters, fetchPlans, fetchContentAssets]);
+    fetchKnowledgeCards();
+  }, [fetchStats, fetchClusters, fetchPlans, fetchContentAssets, fetchKnowledgeCards]);
 
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-navy-900">SEO Content Hub</h2>
-          <p className="text-slate-500 text-sm">SEO 内容中台 — 从关键词研究到多格式内容输出的全链路引擎</p>
-        </div>
+      <ModuleHeader icon={BarChart3} title="营销驱动系统" subtitle="从关键词研究到多格式内容输出的全链路 SEO 引擎">
         {stats && (
           <div className="flex gap-4">
             {[
@@ -137,7 +143,7 @@ const MarketingDrive: React.FC<MarketingDriveProps> = ({ onNewAssetGenerated, as
             ))}
           </div>
         )}
-      </div>
+      </ModuleHeader>
 
       {/* Tab Navigation */}
       <div className="flex border-b border-border gap-1 overflow-x-auto scrollbar-hide">
@@ -211,10 +217,60 @@ const KeywordResearchTab: React.FC<{
   toast: any;
 }> = ({ clusters, onRefresh, toast }) => {
   const [extracting, setExtracting] = useState(false);
+  const [extractingIcp, setExtractingIcp] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualName, setManualName] = useState('');
   const [manualPrimary, setManualPrimary] = useState('');
   const [expandedCluster, setExpandedCluster] = useState<string | null>(null);
+
+  // ICP-Driven keyword extraction
+  const handleExtractFromICP = async () => {
+    setExtractingIcp(true);
+    try {
+      // Fetch product with ICP profile
+      const prodRes = await fetch('/api/products');
+      const products = await prodRes.json();
+      if (!products || products.length === 0) {
+        toast.error('No products found', 'Please create a product first');
+        return;
+      }
+      const product = products[0];
+      
+      // Check if we have enough data for ICP-driven extraction
+      if (!product.icpProfile && !product.exportStrategy) {
+        toast.error('Missing ICP data', 'Please complete export research in Knowledge Engine first to generate ICP profile');
+        return;
+      }
+
+      // Build a minimal exportStrategy if not available
+      const exportStrategy = product.exportStrategy || {
+        productNameEN: product.name,
+        internationalTerms: product.applicationIndustries || [],
+        industryCategory: product.productType || '',
+        competitorAnalysis: [],
+        trends: []
+      };
+      
+      const res = await fetch('/api/seo/keywords/extract-icp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exportStrategy,
+          icpProfile: product.icpProfile,
+          productName: product.name
+        })
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'ICP extraction failed');
+      const data = await res.json();
+      toast.success(`Generated ${data.count} ICP-driven keyword clusters`, 
+        `Awareness: ${data.summary?.byJourneyStage?.awareness || 0}, Consideration: ${data.summary?.byJourneyStage?.consideration || 0}, Decision: ${data.summary?.byJourneyStage?.decision || 0}`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error('ICP keyword extraction failed', err.message);
+    } finally {
+      setExtractingIcp(false);
+    }
+  };
 
   const handleExtractFromStrategy = async () => {
     setExtracting(true);
@@ -292,7 +348,15 @@ const KeywordResearchTab: React.FC<{
   return (
     <div className="space-y-6">
       {/* Actions Bar */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleExtractFromICP}
+          disabled={extractingIcp}
+          className="px-5 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white rounded-xl text-xs font-bold hover:from-navy-800 hover:to-navy-700 transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg"
+        >
+          {extractingIcp ? <Loader2 className="animate-spin" size={14} /> : <Target size={14} className="text-gold" />}
+          ICP 驱动关键词提取
+        </button>
         <button
           onClick={handleExtractFromStrategy}
           disabled={extracting}
@@ -349,7 +413,9 @@ const KeywordResearchTab: React.FC<{
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {clusters.map(cluster => (
-            <div key={cluster.id} className="bg-ivory-surface border border-border rounded-2xl overflow-hidden hover:border-gold/30 transition-all">
+            <div key={cluster.id} className={`bg-ivory-surface border rounded-2xl overflow-hidden hover:border-gold/30 transition-all ${
+              cluster.source === 'icp-driven' ? 'border-gold/40' : 'border-border'
+            }`}>
               <div
                 className="p-5 cursor-pointer flex items-center justify-between"
                 onClick={() => setExpandedCluster(expandedCluster === cluster.id ? null : cluster.id)}
@@ -364,12 +430,36 @@ const KeywordResearchTab: React.FC<{
                     <span className="mx-2 text-slate-300">|</span>
                     {cluster.relatedKeywords?.length || 0} related keywords
                   </p>
+                  {/* ICP-driven metadata */}
+                  {cluster.targetPersona && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">
+                        {cluster.targetPersona.title}
+                      </span>
+                      {cluster.journeyStage && (
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          cluster.journeyStage === 'awareness' ? 'bg-blue-50 text-blue-600' :
+                          cluster.journeyStage === 'consideration' ? 'bg-amber-50 text-amber-600' :
+                          'bg-emerald-50 text-emerald-600'
+                        }`}>
+                          {cluster.journeyStage === 'awareness' ? '🎯 Awareness' : 
+                           cluster.journeyStage === 'consideration' ? '🔍 Consideration' : '💰 Decision'}
+                        </span>
+                      )}
+                      {cluster.primarySearchIntent && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                          {cluster.primarySearchIntent}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                    cluster.source === 'icp-driven' ? 'bg-gold/10 text-gold' :
                     cluster.source === 'export-strategy' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
                   }`}>
-                    {cluster.source === 'export-strategy' ? 'AI Extracted' : 'Manual'}
+                    {cluster.source === 'icp-driven' ? 'ICP-Driven' : cluster.source === 'export-strategy' ? 'AI Extracted' : 'Manual'}
                   </span>
                   <button onClick={(e) => { e.stopPropagation(); handleDeleteCluster(cluster.id); }} className="p-1 hover:bg-red-50 rounded-lg transition-all">
                     <Trash2 size={12} className="text-slate-300 hover:text-red-500" />
@@ -377,10 +467,34 @@ const KeywordResearchTab: React.FC<{
                   <ChevronDown size={14} className={`text-slate-400 transition-transform ${expandedCluster === cluster.id ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-              {expandedCluster === cluster.id && cluster.relatedKeywords?.length > 0 && (
+              {expandedCluster === cluster.id && (
                 <div className="px-5 pb-5 border-t border-border/50">
-                  <div className="grid grid-cols-1 gap-2 mt-3">
-                    {cluster.relatedKeywords.map((kw, i) => (
+                  {/* Pain points addressed */}
+                  {cluster.addressPainPoints && cluster.addressPainPoints.length > 0 && (
+                    <div className="mt-3 mb-3">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">Addresses Pain Points</p>
+                      <div className="flex flex-wrap gap-1">
+                        {cluster.addressPainPoints.map((pp, i) => (
+                          <span key={i} className="text-[9px] px-2 py-1 rounded bg-red-50 text-red-600">{pp}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Recommended content types */}
+                  {cluster.recommendedContentTypes && cluster.recommendedContentTypes.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1.5">Recommended Content Types</p>
+                      <div className="flex flex-wrap gap-1">
+                        {cluster.recommendedContentTypes.map((ct, i) => (
+                          <span key={i} className="text-[9px] px-2 py-1 rounded bg-emerald-50 text-emerald-600">{ct}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Related keywords */}
+                  {cluster.relatedKeywords?.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2 mt-3">
+                      {cluster.relatedKeywords.map((kw, i) => (
                       <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-xs">
                         <span className="font-medium text-navy-900">{kw.keyword}</span>
                         <div className="flex items-center gap-3">
@@ -394,7 +508,8 @@ const KeywordResearchTab: React.FC<{
                         </div>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -414,11 +529,41 @@ const ContentPlanningTab: React.FC<{
   toast: any;
 }> = ({ plans, clusters, onRefresh, toast }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formContentType, setFormContentType] = useState<string>('blog-article');
   const [formPriority, setFormPriority] = useState<string>('P1');
   const [formClusterId, setFormClusterId] = useState<string>('');
   const [formKeywords, setFormKeywords] = useState('');
+
+  // Auto-generate content plans from ICP-driven clusters
+  const handleAutoGenerate = async () => {
+    const icpClusters = clusters.filter(c => c.source === 'icp-driven' && c.targetPersona);
+    if (icpClusters.length === 0) {
+      toast.error('No ICP-driven clusters found', 'Please extract ICP-driven keywords first');
+      return;
+    }
+    
+    setAutoGenerating(true);
+    try {
+      const res = await fetch('/api/seo/content-plans/auto-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clusterIds: icpClusters.map(c => c.id)
+        })
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Auto-generation failed');
+      const data = await res.json();
+      toast.success(`Generated ${data.count} content plans`, 
+        `P0: ${data.summary?.byPriority?.P0 || 0}, P1: ${data.summary?.byPriority?.P1 || 0}, P2: ${data.summary?.byPriority?.P2 || 0}`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error('Auto-generation failed', err.message);
+    } finally {
+      setAutoGenerating(false);
+    }
+  };
 
   const handleCreatePlan = async () => {
     if (!formTitle) return;
@@ -479,12 +624,24 @@ const ContentPlanningTab: React.FC<{
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <p className="text-xs text-slate-500">Editorial calendar with SEO-driven content pipeline</p>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-5 py-2.5 bg-navy-900 text-white rounded-xl text-xs font-bold hover:bg-navy-800 transition-all flex items-center gap-2"
-        >
-          <Plus size={14} /> New Content Plan
-        </button>
+        <div className="flex gap-2">
+          {clusters.some(c => c.source === 'icp-driven') && (
+            <button
+              onClick={handleAutoGenerate}
+              disabled={autoGenerating}
+              className="px-5 py-2.5 bg-gradient-to-r from-gold to-amber-500 text-navy-900 rounded-xl text-xs font-bold hover:from-amber-500 hover:to-gold transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {autoGenerating ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+              智能生成内容计划
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="px-5 py-2.5 bg-navy-900 text-white rounded-xl text-xs font-bold hover:bg-navy-800 transition-all flex items-center gap-2"
+          >
+            <Plus size={14} /> New Content Plan
+          </button>
+        </div>
       </div>
 
       {/* Create Form */}
@@ -630,8 +787,7 @@ const ContentGenerationTab: React.FC<{
           targetKeywords,
           focusKeyword: genFocusKeyword || targetKeywords[0],
           title: genTitle || undefined,
-          language: 'en',
-          knowledgeCards: knowledgeCards
+          language: 'en'
         })
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Generation failed');

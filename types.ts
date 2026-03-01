@@ -134,6 +134,16 @@ export interface ContentAsset {
 }
 
 // SEO Content Hub types
+export type JourneyStage = 'awareness' | 'consideration' | 'decision';
+export type BuyerRole = 'decision_maker' | 'influencer' | 'user' | 'gatekeeper';
+export type ContentTone = 'technical' | 'business' | 'educational' | 'persuasive';
+
+export interface TargetPersonaFE {
+  title: string;
+  role: BuyerRole;
+  concerns: string[];
+}
+
 export interface KeywordClusterFE {
   id: string;
   name: string;
@@ -145,8 +155,14 @@ export interface KeywordClusterFE {
     searchIntent: 'informational' | 'commercial' | 'transactional' | 'navigational';
     priority: number;
   }>;
-  source: 'export-strategy' | 'manual' | 'competitor-analysis';
+  source: 'export-strategy' | 'manual' | 'competitor-analysis' | 'icp-driven';
   status: 'active' | 'archived';
+  // ICP-driven fields
+  primarySearchIntent?: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  targetPersona?: TargetPersonaFE;
+  journeyStage?: JourneyStage;
+  addressPainPoints?: string[];
+  recommendedContentTypes?: string[];
   createdAt?: string;
 }
 
@@ -164,6 +180,17 @@ export interface ContentPlanFE {
   assignedKnowledgeCards: string[];
   outline?: string[];
   notes?: string;
+  // ICP-driven fields
+  targetPersona?: TargetPersonaFE;
+  journeyStage?: JourneyStage;
+  addressPainPoints?: string[];
+  recommendedContentType?: ContentPlanContentType;
+  contentTone?: ContentTone;
+  icpContext?: {
+    industryTags?: string[];
+    buyingTriggers?: string[];
+    disqualifiers?: string[];
+  };
   createdAt?: string;
 }
 
@@ -327,6 +354,7 @@ export interface LeadRun {
   status: RunStatus;
   progress: {
     discovery: number;
+    websiteAnalysis: number;
     enrichment: number;
     contact: number;
     research: number;
@@ -356,6 +384,34 @@ export interface TenderMetadata {
   tenderUrl?: string;
 }
 
+// --- Website Analysis Types ---
+
+export type WebsiteAnalysisStatus = 'pending' | 'analyzing' | 'qualified' | 'maybe' | 'disqualified' | 'failed';
+
+export interface WebsiteAnalysis {
+  status: WebsiteAnalysisStatus;
+  qualificationReason?: string;
+  relevanceScore: number;
+  products: Array<{ name: string; description?: string }>;
+  equipment: Array<{ type: string; brand?: string; context?: string }>;
+  technologies: string[];
+  companySize?: {
+    employees?: string;
+    facilities?: string;
+    indicators?: string[];
+  };
+  breakdown: {
+    industryMatch: { score: number; reasoning: string };
+    businessRelevance: { score: number; reasoning: string };
+    sizeMatch: { score: number; reasoning: string };
+    technologyGap: { score: number; reasoning: string };
+  };
+  pagesCrawled: Array<{ url: string; pageType: string; success: boolean }>;
+  language?: string;
+  analyzedAt?: string;
+  errorMessage?: string;
+}
+
 export interface Company {
   id: string;
   leadRunId?: string;
@@ -367,7 +423,8 @@ export interface Company {
   source: string;
   status: CompanyStatus;
   notes?: string;
-  tenderMetadata?: TenderMetadata;  // 招标机会元数据
+  tenderMetadata?: TenderMetadata;
+  websiteAnalysis?: WebsiteAnalysis;
   createdAt: string;
   updatedAt: string;
   score?: Scoring;

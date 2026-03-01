@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { LeadRun, Product, CountryConfig } from '../types';
-import { Play, Clock, CheckCircle2, AlertCircle, RefreshCw, Plus, Globe, Languages, Target, Search, Building2, FileText, Calendar, Loader2, Users, Zap, ChevronDown, ChevronUp, X, Star, Sliders } from 'lucide-react';
+import { Play, Clock, CheckCircle2, AlertCircle, RefreshCw, Plus, Globe, Languages, Target, Search, Building2, FileText, Calendar, Loader2, Users, Zap, ChevronDown, ChevronUp, X, Star, Sliders, ShieldCheck, XCircle, HelpCircle } from 'lucide-react';
 
 interface LeadRunsProps {
   onViewPool: () => void;
@@ -99,7 +99,7 @@ const SEARCH_STRATEGIES = [
   { id: 'exhibition', name: '展会参展商', description: '从行业展会参展商名录中发现潜在客户', icon: Calendar },
 ];
 
-type PipelineStage = 'idle' | 'discovery' | 'enrichment' | 'contacts' | 'done' | 'error';
+type PipelineStage = 'idle' | 'discovery' | 'website-analysis' | 'enrichment' | 'contacts' | 'done' | 'error';
 
 interface ActivePipeline {
   runId: string;
@@ -107,6 +107,9 @@ interface ActivePipeline {
   totalQueries: number;
   completedQueries: number;
   discoveredCompanies: number;
+  analyzedCompanies: number;
+  qualifiedCompanies: number;
+  filteredCompanies: number;
   enrichedCompanies: number;
   totalContacts: number;
   totalCompanies: number;
@@ -238,6 +241,9 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
       totalQueries: countries.reduce((sum, c) => sum + c.allocatedQueries, 0),
       completedQueries: 0,
       discoveredCompanies: 0,
+      analyzedCompanies: 0,
+      qualifiedCompanies: 0,
+      filteredCompanies: 0,
       enrichedCompanies: 0,
       totalContacts: 0,
       totalCompanies: 0,
@@ -321,17 +327,74 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
         return;
       }
 
-      // === Phase 2: Enrichment ===
-      setActivePipeline(prev => prev ? { ...prev, stage: 'enrichment' } : prev);
-      addLog(`Starting enrichment for ${allCompanyIds.length} companies...`);
+      // === Phase 2: Website Analysis (filter before enrichment) ===
+      setActivePipeline(prev => prev ? { ...prev, stage: 'website-analysis' } : prev);
+      addLog(`Starting website analysis for ${allCompanyIds.length} companies...`);
+
+      const qualifiedCompanyIds: string[] = [];
 
       for (let i = 0; i < allCompanyIds.length; i++) {
-        addLog(`Enriching company ${i + 1}/${allCompanyIds.length}...`);
+        addLog(`Analyzing website ${i + 1}/${allCompanyIds.length}...`);
         try {
-          const res = await fetch(`/api/runs/${runId}/enrich/${allCompanyIds[i]}`, { method: 'POST' });
+          const res = await fetch(`/api/runs/${runId}/analyze-website/${allCompanyIds[i]}`, { method: 'POST' });
           const data = await res.json();
           if (res.ok) {
-            addLog(`Enriched: ${data.company?.name || 'unknown'} → ${data.tier}`);
+            const qual = data.qualification || 'MAYBE';
+            const score = data.relevanceScore || 0;
+            const companyName = data.company?.name || 'unknown';
+
+            if (qual === 'DISQUALIFIED') {
+              addLog(`\u2717 ${companyName} \u2192 DISQUALIFIED (score: ${score}) - ${data.reasoning || 'filtered out'}`);
+              setActivePipeline(prev => prev ? {
+                ...prev,
+                analyzedCompanies: i + 1,
+                filteredCompanies: prev.filteredCompanies + 1
+              } : prev);
+            } else {
+              qualifiedCompanyIds.push(allCompanyIds[i]);
+              const icon = qual === 'QUALIFIED' ? '\u2713' : '?';
+              addLog(`${icon} ${companyName} \u2192 ${qual} (score: ${score})`);
+              setActivePipeline(prev => prev ? {
+                ...prev,
+                analyzedCompanies: i + 1,
+                qualifiedCompanies: prev.qualifiedCompanies + 1
+              } : prev);
+            }
+          } else {
+            // On error, keep the company (conservative approach)
+            qualifiedCompanyIds.push(allCompanyIds[i]);
+            addLog(`Website analysis failed for company ${i + 1}: ${data.error}, keeping in pipeline`);
+            setActivePipeline(prev => prev ? { ...prev, analyzedCompanies: i + 1 } : prev);
+          }
+        } catch (e: any) {
+          qualifiedCompanyIds.push(allCompanyIds[i]);
+          addLog(`Website analysis error for company ${i + 1}: ${e.message}, keeping in pipeline`);
+          setActivePipeline(prev => prev ? { ...prev, analyzedCompanies: i + 1 } : prev);
+        }
+      }
+
+      addLog(`Website analysis complete: ${qualifiedCompanyIds.length} qualified, ${allCompanyIds.length - qualifiedCompanyIds.length} filtered out`);
+
+      if (qualifiedCompanyIds.length === 0) {
+        addLog('No qualified companies after website analysis. Pipeline stopped.');
+        setActivePipeline(prev => prev ? { ...prev, stage: 'done' } : prev);
+        await fetch(`/api/runs/${runId}/finalize`, { method: 'POST' });
+        fetch('/api/runs').then(res => res.json()).then(setRuns);
+        pipelineRef.current = false;
+        return;
+      }
+
+      // === Phase 3: Enrichment (only qualified companies) ===
+      setActivePipeline(prev => prev ? { ...prev, stage: 'enrichment', totalCompanies: qualifiedCompanyIds.length } : prev);
+      addLog(`Starting enrichment for ${qualifiedCompanyIds.length} qualified companies...`);
+
+      for (let i = 0; i < qualifiedCompanyIds.length; i++) {
+        addLog(`Enriching company ${i + 1}/${qualifiedCompanyIds.length}...`);
+        try {
+          const res = await fetch(`/api/runs/${runId}/enrich/${qualifiedCompanyIds[i]}`, { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            addLog(`Enriched: ${data.company?.name || 'unknown'} \u2192 ${data.tier}`);
             setActivePipeline(prev => prev ? { ...prev, enrichedCompanies: i + 1 } : prev);
           } else {
             addLog(`Enrich failed for company ${i + 1}: ${data.error}`);
@@ -341,14 +404,14 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
         }
       }
 
-      // === Phase 3: Contact Mining ===
+      // === Phase 4: Contact Mining (only qualified companies) ===
       setActivePipeline(prev => prev ? { ...prev, stage: 'contacts' } : prev);
-      addLog(`Starting contact mining for ${allCompanyIds.length} companies...`);
+      addLog(`Starting contact mining for ${qualifiedCompanyIds.length} companies...`);
 
-      for (let i = 0; i < allCompanyIds.length; i++) {
-        addLog(`Mining contacts for company ${i + 1}/${allCompanyIds.length}...`);
+      for (let i = 0; i < qualifiedCompanyIds.length; i++) {
+        addLog(`Mining contacts for company ${i + 1}/${qualifiedCompanyIds.length}...`);
         try {
-          const res = await fetch(`/api/runs/${runId}/contacts/${allCompanyIds[i]}`, { method: 'POST' });
+          const res = await fetch(`/api/runs/${runId}/contacts/${qualifiedCompanyIds[i]}`, { method: 'POST' });
           const data = await res.json();
           if (res.ok) {
             const contactCount = data.contacts?.length || 0;
@@ -441,6 +504,7 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
   const getStageLabel = (stage: PipelineStage) => {
     switch (stage) {
       case 'discovery': return '公司发现';
+      case 'website-analysis': return '网站验证';
       case 'enrichment': return '企业穿透';
       case 'contacts': return '联系人挖掘';
       case 'done': return '已完成';
@@ -451,14 +515,16 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
 
   const getStageProgress = () => {
     if (!activePipeline) return 0;
-    const { stage, completedQueries, totalQueries, enrichedCompanies, totalCompanies } = activePipeline;
+    const { stage, completedQueries, totalQueries, analyzedCompanies, discoveredCompanies, enrichedCompanies, totalCompanies } = activePipeline;
     switch (stage) {
       case 'discovery':
-        return Math.round((completedQueries / Math.max(totalQueries, 1)) * 33);
+        return Math.round((completedQueries / Math.max(totalQueries, 1)) * 25);
+      case 'website-analysis':
+        return 25 + Math.round((analyzedCompanies / Math.max(discoveredCompanies, 1)) * 25);
       case 'enrichment':
-        return 33 + Math.round((enrichedCompanies / Math.max(totalCompanies, 1)) * 33);
+        return 50 + Math.round((enrichedCompanies / Math.max(totalCompanies, 1)) * 25);
       case 'contacts':
-        return 66 + Math.round((enrichedCompanies / Math.max(totalCompanies, 1)) * 34);
+        return 75 + Math.round((enrichedCompanies / Math.max(totalCompanies, 1)) * 25);
       case 'done': return 100;
       default: return 0;
     }
@@ -761,9 +827,10 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
 
           {/* Stage indicators */}
           <div className="flex items-center gap-2 mb-6">
-            {(['discovery', 'enrichment', 'contacts'] as PipelineStage[]).map((stage, i) => {
+            {(['discovery', 'website-analysis', 'enrichment', 'contacts'] as PipelineStage[]).map((stage, i) => {
               const isActive = activePipeline.stage === stage;
-              const isDone = ['discovery', 'enrichment', 'contacts'].indexOf(activePipeline.stage) > i || activePipeline.stage === 'done';
+              const stageOrder = ['discovery', 'website-analysis', 'enrichment', 'contacts'];
+              const isDone = stageOrder.indexOf(activePipeline.stage) > i || activePipeline.stage === 'done';
               return (
                 <React.Fragment key={stage}>
                   {i > 0 && <div className={`flex-1 h-0.5 ${isDone ? 'bg-emerald-400' : isActive ? 'bg-gold' : 'bg-slate-200'}`} />}
@@ -795,11 +862,21 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-ivory/50 rounded-xl p-4 text-center border border-border">
               <Building2 size={20} className="mx-auto text-slate-400 mb-2" />
               <p className="text-2xl font-black text-navy-900">{activePipeline.discoveredCompanies}</p>
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">发现公司</p>
+            </div>
+            <div className="bg-ivory/50 rounded-xl p-4 text-center border border-border">
+              <ShieldCheck size={20} className="mx-auto text-slate-400 mb-2" />
+              <p className="text-2xl font-black text-navy-900">{activePipeline.qualifiedCompanies}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                通过验证
+                {activePipeline.filteredCompanies > 0 && (
+                  <span className="text-red-400 ml-1">(-{activePipeline.filteredCompanies})</span>
+                )}
+              </p>
             </div>
             <div className="bg-ivory/50 rounded-xl p-4 text-center border border-border">
               <Zap size={20} className="mx-auto text-slate-400 mb-2" />
@@ -833,7 +910,7 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
               <div>
                 <h3 className="text-lg font-bold text-navy-900">Pipeline 执行完成</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  发现 {activePipeline.discoveredCompanies} 家公司，穿透 {activePipeline.enrichedCompanies} 家，挖掘 {activePipeline.totalContacts} 位联系人
+                  发现 {activePipeline.discoveredCompanies} 家公司，验证通过 {activePipeline.qualifiedCompanies} 家（过滤 {activePipeline.filteredCompanies} 家），穿透 {activePipeline.enrichedCompanies} 家，挖掘 {activePipeline.totalContacts} 位联系人
                 </p>
               </div>
             </div>
@@ -915,6 +992,9 @@ const LeadRuns: React.FC<LeadRunsProps> = ({ onViewPool }) => {
                   <div className="flex justify-between mt-2 text-[9px] text-slate-400">
                     <span className="flex items-center gap-1">
                       <Building2 size={10} /> 发现 {run.progress.discovery} 家
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck size={10} /> 验证 {run.progress.websiteAnalysis || 0} 家
                     </span>
                     <span className="flex items-center gap-1">
                       <Zap size={10} /> 穿透 {(run.progress as any).enrichment || run.progress.research || 0} 家
