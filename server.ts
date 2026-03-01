@@ -3339,12 +3339,6 @@ ${formatPrompts[format]}`;
     }
   });
 
-  // Global error handler
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error('Unhandled Express error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
-  });
-
   // ==================== Push Pipeline Records ====================
 
   // List push records (with optional status filter)
@@ -3456,6 +3450,12 @@ ${formatPrompts[format]}`;
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to update client site config', details: err.message });
     }
+  });
+
+  // Global error handler - must be after all API routes
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled Express error:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   });
 
   // --- Local Dev: Vite Middleware + Listen ---
