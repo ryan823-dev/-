@@ -23,6 +23,9 @@ import {
   Search,
   Zap,
   Image,
+  Brain,
+  Radar,
+  TrendingUp,
 } from "lucide-react";
 import { isPlatformAdmin } from "@/lib/permissions";
 import {
@@ -65,6 +68,7 @@ export function AppSidebar() {
   );
 
   const navGroups = [
+    // 工作台
     {
       key: "main",
       items: [
@@ -75,14 +79,17 @@ export function AppSidebar() {
         },
       ],
     },
+    // 知识引擎（基础层）
     {
-      key: "assets",
-      label: t("assets"),
-      icon: Image,
+      key: "knowledge",
+      label: t("knowledge"),
+      icon: Brain,
       items: [
+        { title: t("knowledgeProfile"), url: "/zh-CN/knowledge", icon: Brain },
         { title: t("assetAll"), url: "/zh-CN/assets", icon: FolderOpen },
       ],
     },
+    // 产品管理
     {
       key: "products",
       label: t("products"),
@@ -96,12 +103,13 @@ export function AppSidebar() {
         },
       ],
     },
+    // 营销系统（Inbound）
     {
-      key: "seo",
-      label: t("seo"),
-      icon: FileText,
+      key: "marketing",
+      label: t("marketing"),
+      icon: TrendingUp,
       items: [
-        { title: t("seoContent"), url: "/zh-CN/seo", icon: List },
+        { title: t("seoContent"), url: "/zh-CN/seo", icon: FileText },
         {
           title: t("seoCategories"),
           url: "/zh-CN/seo/categories",
@@ -110,6 +118,22 @@ export function AppSidebar() {
         { title: t("seoPlanner"), url: "/zh-CN/seo/planner", icon: Search },
       ],
     },
+    // 获客雷达（Outbound）
+    {
+      key: "radar",
+      label: t("radar"),
+      icon: Radar,
+      items: [
+        { title: t("leadResearch"), url: "/zh-CN/leads/research", icon: Search },
+        { title: t("leadList"), url: "/zh-CN/leads", icon: List },
+        {
+          title: t("leadCampaigns"),
+          url: "/zh-CN/leads/campaigns",
+          icon: Megaphone,
+        },
+      ],
+    },
+    // 声量枢纽（社媒+PR）
     {
       key: "social",
       label: t("social"),
@@ -133,20 +157,7 @@ export function AppSidebar() {
         },
       ],
     },
-    {
-      key: "leads",
-      label: t("leads"),
-      icon: UserSearch,
-      items: [
-        { title: t("leadList"), url: "/zh-CN/leads", icon: List },
-        {
-          title: t("leadCampaigns"),
-          url: "/zh-CN/leads/campaigns",
-          icon: Megaphone,
-        },
-        { title: t("leadResearch"), url: "/zh-CN/leads/research", icon: Search },
-      ],
-    },
+    // 设置
     {
       key: "settings",
       label: t("settings"),
@@ -207,7 +218,7 @@ export function AppSidebar() {
                   <Bot className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">出海管理平台</span>
+                  <span className="truncate font-semibold">出海获客智能体</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {user?.tenantName || "Loading..."}
                   </span>
@@ -274,6 +285,8 @@ export function AppSidebar() {
                                 item.url !== "/zh-CN/social" &&
                                 item.url !== "/zh-CN/leads" &&
                                 item.url !== "/zh-CN/settings" &&
+                                item.url !== "/zh-CN/knowledge" &&
+                                item.url !== "/zh-CN/assets" &&
                                 pathname.startsWith(item.url))
                             }
                           >

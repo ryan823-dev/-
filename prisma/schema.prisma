@@ -35,6 +35,7 @@ model Tenant {
   assetFolders   AssetFolder[]
   assets         Asset[]
   apiKeys        ApiKey[]
+  companyProfile CompanyProfile?
 }
 
 model WebsiteConfig {
@@ -437,6 +438,44 @@ model Activity {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ==================== MODULE 5: ASSET HUB ====================
+
+// ==================== MODULE 6: KNOWLEDGE ENGINE ====================
+
+model CompanyProfile {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // 企业基本信息（AI提炼）
+  companyName  String?
+  companyIntro String? @db.Text
+
+  // 核心能力画像
+  coreProducts    Json @default("[]") // 核心产品/服务能力
+  techAdvantages  Json @default("[]") // 技术优势
+  scenarios       Json @default("[]") // 适用场景/行业
+  differentiators Json @default("[]") // 差异化卖点
+
+  // 目标客户画像 (ICP)
+  targetIndustries Json @default("[]") // 目标行业
+  targetRegions    Json @default("[]") // 目标地区
+  buyerPersonas    Json @default("[]") // 买家角色
+  painPoints       Json @default("[]") // 客户痛点
+  buyingTriggers   Json @default("[]") // 购买触发因素
+
+  // AI 分析元数据
+  lastAnalyzedAt DateTime?
+  analysisSource Json    @default("[]") // 分析使用的素材ID列表
+  aiModel        String? // 使用的AI模型
+  rawAnalysis    String? @db.Text // AI原始分析结果
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 // ==================== MODULE 5: ASSET HUB ====================

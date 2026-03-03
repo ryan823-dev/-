@@ -56,3 +56,14 @@ doc_tools/output/
 .~*.pptx
 doc_tools/
 SEO-GEO-AUDIT-AND-PLAN.md
+
+# sub-projects (not part of this Next.js app)
+machrio/
+mroport.com/
+paintcell/
+paintcell-site/
+ryan823-project/
+vetsphere/
+shipyard-xevora/
+POD-Dreamworks/
+-/
