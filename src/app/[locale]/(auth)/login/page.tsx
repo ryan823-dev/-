@@ -137,8 +137,14 @@ export default function LoginPage() {
         // Cross-domain redirect to Vertax subdomain
         await handleCrossDomainRedirect();
       } else {
-        // Normal redirect to dashboard
-        router.push("/zh-CN/dashboard");
+        // Determine redirect based on current domain
+        const hostname = window.location.hostname;
+        const isTowerDomain = hostname === "tower.vertax.top" || hostname === "tower.vertax.cn";
+        const isCustomerDomain = hostname.endsWith(".vertax.top") && !isTowerDomain;
+        
+        // Customer view → /c/home, Operations view → /dashboard
+        const targetPath = isCustomerDomain ? "/zh-CN/c/home" : "/zh-CN/dashboard";
+        router.push(targetPath);
         router.refresh();
       }
     }
