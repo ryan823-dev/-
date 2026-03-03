@@ -49,6 +49,8 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "assets": "Asset Hub",
+    "assetAll": "All Assets",
     "products": "Products",
     "productList": "Product List",
     "productCategories": "Categories",

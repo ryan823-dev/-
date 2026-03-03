@@ -49,6 +49,8 @@
   },
   "nav": {
     "dashboard": "工作台",
+    "assets": "素材中心",
+    "assetAll": "全部素材",
     "products": "产品管理",
     "productList": "产品列表",
     "productCategories": "产品分类",

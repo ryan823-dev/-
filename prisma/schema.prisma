@@ -32,6 +32,9 @@ model Tenant {
   categories     ContentCategory[]
   websiteConfig  WebsiteConfig?
   activities     Activity[]
+  assetFolders   AssetFolder[]
+  assets         Asset[]
+  apiKeys        ApiKey[]
 }
 
 model WebsiteConfig {
@@ -71,6 +74,7 @@ model User {
   socialPosts SocialPost[]
   ownedLeads  Lead[]
   activities  Activity[]
+  assets      Asset[]
 
   @@index([tenantId])
   @@index([email])
@@ -124,6 +128,23 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  key         String    @unique
+  permissions String[]  @default(["assets:write"])
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([key])
 }
 
 // ==================== MODULE 1: PRODUCTS ====================
@@ -415,5 +436,68 @@ model Activity {
   @@index([tenantId])
   @@index([userId])
   @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ==================== MODULE 5: ASSET HUB ====================
+
+model AssetFolder {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  parentId    String?
+  parent      AssetFolder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children    AssetFolder[] @relation("FolderTree")
+  color       String?
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  assets Asset[]
+
+  @@unique([tenantId, name, parentId])
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+model Asset {
+  id           String       @id @default(cuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+  folderId     String?
+  folder       AssetFolder? @relation(fields: [folderId], references: [id])
+
+  // 文件信息
+  originalName String
+  storageKey   String
+  mimeType     String
+  fileSize     BigInt
+  extension    String
+
+  // 分类
+  fileCategory String   // video | image | document | audio | other
+  purpose      String[] // knowledge | marketing | reference
+  tags         String[]
+
+  // 内容
+  title       String
+  description String?
+  metadata    Json     @default("{}")
+
+  // 状态
+  status    String    @default("uploading") // uploading | active | archived | deleted
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([tenantId])
+  @@index([tenantId, fileCategory])
+  @@index([tenantId, status])
+  @@index([folderId])
+  @@index([uploadedById])
   @@index([createdAt])
 }

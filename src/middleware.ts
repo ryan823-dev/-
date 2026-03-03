@@ -20,6 +20,11 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
+  // Allow external API routes (assets API for VertaX integration)
+  if (pathname.startsWith("/api/assets")) {
+    return NextResponse.next();
+  }
+
   // Redirect root to dashboard
   if (pathname === "/" || pathname === "/zh-CN" || pathname === "/en") {
     if (isDemoMode || req.auth) {

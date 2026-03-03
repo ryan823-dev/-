@@ -22,6 +22,7 @@ import {
   Megaphone,
   Search,
   Zap,
+  Image,
 } from "lucide-react";
 import { isPlatformAdmin } from "@/lib/permissions";
 import {
@@ -72,6 +73,14 @@ export function AppSidebar() {
           url: "/zh-CN/dashboard",
           icon: LayoutDashboard,
         },
+      ],
+    },
+    {
+      key: "assets",
+      label: t("assets"),
+      icon: Image,
+      items: [
+        { title: t("assetAll"), url: "/zh-CN/assets", icon: FolderOpen },
       ],
     },
     {
