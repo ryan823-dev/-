@@ -7,30 +7,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-export type WebsiteConfigFormData = {
-  id?: string;
-  url: string;
-  siteType: string;
-  supabaseUrl: string;
-  functionName: string;
-  pushSecret: string;
-  approvalTimeoutHours: number;
-  isActive: boolean;
-};
-
-export type WebsiteConfigDetail = {
-  id: string;
-  url: string | null;
-  siteType: string;
-  supabaseUrl: string | null;
-  functionName: string | null;
-  pushSecret: string | null;
-  approvalTimeoutHours: number;
-  isActive: boolean;
-  apiKey: string | null;
-  publishEndpoint: string | null;
-};
+import type { WebsiteConfigFormData, WebsiteConfigDetail } from "./website-config.types";
 
 // ===================== 获取配置 =====================
 

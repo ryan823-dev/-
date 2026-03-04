@@ -44,9 +44,8 @@ import {
   confirmPushRecord,
   retryPush,
   getWebsiteConfig,
-  type PushRecordData,
-  type WebsiteConfigData,
 } from '@/actions/publishing';
+import type { PushRecordData, WebsiteConfigData } from '@/actions/publishing.types';
 import { SkillPanel } from '@/components/skills';
 
 type ViewMode = 'list' | 'create' | 'detail';

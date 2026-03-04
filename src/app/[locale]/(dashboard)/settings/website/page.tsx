@@ -22,8 +22,8 @@ import {
   getWebsiteConfigDetail,
   saveWebsiteConfig,
   testWebsiteConnection,
-  type WebsiteConfigDetail,
 } from "@/actions/website-config";
+import type { WebsiteConfigDetail } from "@/actions/website-config.types";
 
 export default function WebsitePage() {
   const [loading, setLoading] = useState(true);
