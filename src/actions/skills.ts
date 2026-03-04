@@ -98,6 +98,6 @@ export async function getSkillInfo(skillName: string): Promise<{
   };
 }
 
-// ==================== Re-export Constants ====================
-
-export { SKILL_NAMES };
+// Note: SKILL_NAMES is NOT re-exported here because "use server" files
+// can only export async functions. Import SKILL_NAMES directly from
+// '@/lib/skills/registry' instead.

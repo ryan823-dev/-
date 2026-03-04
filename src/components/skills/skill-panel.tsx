@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   Package,
 } from 'lucide-react';
-import { getAvailableSkills, SKILL_NAMES } from '@/actions/skills';
+import { getAvailableSkills } from '@/actions/skills';
+import { SKILL_NAMES } from '@/lib/skills/registry';
 import { SkillTrigger } from './skill-trigger';
 import type { SkillEngine } from '@/lib/skills/types';
 
