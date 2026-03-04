@@ -12,7 +12,7 @@ POD-Dreamworks/
 # Scripts and tools
 scripts/
 doc_tools/
-skills/
+/skills/
 vibe_images/
 
 # IDE / agent config
@@ -29,6 +29,3 @@ vibe_images/
 # Python
 __pycache__/
 *.pyc
-
-# Prisma migrations (generated on deploy)
-prisma/migrations/
