@@ -1,4 +1,5 @@
-import { ROLES } from "./constants";
+import { ROLES, APP_ROLES, DECIDER_ONLY_ACTIONS, type AppRole, type DeciderAction } from "./constants";
+import type { Session } from "next-auth";
 
 export type UserPermissions = {
   permissions: string[];
@@ -39,4 +40,47 @@ export function isCompanyAdmin(user: UserPermissions | null | undefined): boolea
     user.roleName === ROLES.COMPANY_ADMIN ||
     user.roleName === ROLES.PLATFORM_ADMIN
   );
+}
+
+// ==================== RBAC 应用角色扩展 ====================
+
+/**
+ * 将数据库 roleName 映射为应用角色
+ */
+export function mapRoleToAppRole(roleName: string | undefined | null): AppRole {
+  if (!roleName) return APP_ROLES.OPERATOR;
+  if (roleName === ROLES.PLATFORM_ADMIN || roleName === ROLES.COMPANY_ADMIN) {
+    return APP_ROLES.DECIDER;
+  }
+  return APP_ROLES.OPERATOR;
+}
+
+/**
+ * 判断用户是否为决策者
+ */
+export function isDecider(user: UserPermissions | null | undefined): boolean {
+  if (!user) return false;
+  return mapRoleToAppRole(user.roleName) === APP_ROLES.DECIDER;
+}
+
+/**
+ * 前端权限检查：某操作是否允许
+ */
+export function canPerformAction(appRole: AppRole, action: string): boolean {
+  if (appRole === APP_ROLES.DECIDER) return true;
+  return !(DECIDER_ONLY_ACTIONS as readonly string[]).includes(action);
+}
+
+/**
+ * 服务端守卫：要求决策者权限，否则返回错误
+ */
+export function requireDecider(session: Session | null): { authorized: true } | { authorized: false; error: string } {
+  if (!session?.user?.tenantId || !session?.user?.id) {
+    return { authorized: false, error: '未登录，请重新登录。' };
+  }
+  const roleName = (session.user as Record<string, unknown>).roleName as string | undefined;
+  if (mapRoleToAppRole(roleName) !== APP_ROLES.DECIDER) {
+    return { authorized: false, error: '该操作需要决策者权限。请联系管理员。' };
+  }
+  return { authorized: true };
 }

@@ -5,6 +5,7 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { requireDecider } from '@/lib/permissions';
 import type { Prisma } from '@/generated/prisma/client';
 import { 
   createRadarTask, 
@@ -843,6 +844,427 @@ export async function getRadarStatsV2(): Promise<RadarStatsData> {
     companies,
     runningTasks,
   };
+}
+
+// ==================== RadarSearchProfile 管理 ====================
+
+export interface RadarSearchProfileData {
+  id: string;
+  name: string;
+  description: string | null;
+  segmentId: string | null;
+  personaId: string | null;
+  keywords: Record<string, string[]>;
+  negativeKeywords: string[] | null;
+  targetCountries: string[];
+  targetRegions: string[];
+  industryCodes: string[];
+  categoryFilters: string[];
+  enabledChannels: string[];
+  sourceIds: string[];
+  isActive: boolean;
+  scheduleRule: string;
+  lastRunAt: Date | null;
+  nextRunAt: Date | null;
+  lockToken: string | null;
+  lockedAt: Date | null;
+  lockedBy: string | null;
+  maxRunSeconds: number;
+  autoQualify: boolean;
+  autoEnrich: boolean;
+  runStats: {
+    totalRuns?: number;
+    totalNew?: number;
+    lastError?: string;
+    avgDurationMs?: number;
+  } | null;
+  exclusionRules: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+  // 关联
+  segment?: { id: string; name: string } | null;
+  persona?: { id: string; name: string } | null;
+  _count?: { cursors: number };
+}
+
+export interface CreateRadarSearchProfileInput {
+  name: string;
+  description?: string;
+  segmentId?: string;
+  personaId?: string;
+  keywords?: Record<string, string[]>;
+  negativeKeywords?: string[];
+  targetCountries?: string[];
+  targetRegions?: string[];
+  industryCodes?: string[];
+  categoryFilters?: string[];
+  enabledChannels?: string[];
+  sourceIds?: string[];
+  scheduleRule?: string;
+  maxRunSeconds?: number;
+  autoQualify?: boolean;
+  autoEnrich?: boolean;
+}
+
+/**
+ * 获取扫描计划列表
+ */
+export async function getRadarSearchProfiles(options?: {
+  isActive?: boolean;
+  limit?: number;
+}): Promise<RadarSearchProfileData[]> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  const where: Record<string, unknown> = {
+    tenantId: session.user.tenantId,
+  };
+  
+  if (options?.isActive !== undefined) {
+    where.isActive = options.isActive;
+  }
+  
+  const profiles = await prisma.radarSearchProfile.findMany({
+    where,
+    orderBy: [
+      { isActive: 'desc' },
+      { nextRunAt: 'asc' },
+      { createdAt: 'desc' },
+    ],
+    take: options?.limit || 100,
+  });
+  
+  // 获取关联的 segment 和 persona
+  const segmentIds = profiles.map(p => p.segmentId).filter(Boolean) as string[];
+  const personaIds = profiles.map(p => p.personaId).filter(Boolean) as string[];
+  
+  const [segments, personas, cursorCounts] = await Promise.all([
+    segmentIds.length > 0 
+      ? prisma.iCPSegment.findMany({ where: { id: { in: segmentIds } }, select: { id: true, name: true } })
+      : [],
+    personaIds.length > 0
+      ? prisma.persona.findMany({ where: { id: { in: personaIds } }, select: { id: true, name: true } })
+      : [],
+    prisma.radarScanCursor.groupBy({
+      by: ['profileId'],
+      where: { profileId: { in: profiles.map(p => p.id) } },
+      _count: true,
+    }),
+  ]);
+  
+  const segmentMap = new Map(segments.map(s => [s.id, s]));
+  const personaMap = new Map(personas.map(p => [p.id, p]));
+  const cursorCountMap = new Map(cursorCounts.map(c => [c.profileId, c._count]));
+  
+  return profiles.map(p => ({
+    ...p,
+    keywords: (p.keywords || {}) as Record<string, string[]>,
+    negativeKeywords: p.negativeKeywords as string[] | null,
+    enabledChannels: p.enabledChannels as string[],
+    runStats: p.runStats as RadarSearchProfileData['runStats'],
+    exclusionRules: p.exclusionRules as Record<string, unknown> | null,
+    segment: p.segmentId ? segmentMap.get(p.segmentId) || null : null,
+    persona: p.personaId ? personaMap.get(p.personaId) || null : null,
+    _count: { cursors: cursorCountMap.get(p.id) || 0 },
+  }));
+}
+
+/**
+ * 获取单个扫描计划
+ */
+export async function getRadarSearchProfile(profileId: string): Promise<RadarSearchProfileData | null> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  const profile = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!profile || profile.tenantId !== session.user.tenantId) {
+    return null;
+  }
+  
+  // 获取关联数据
+  const [segment, persona, cursorCount] = await Promise.all([
+    profile.segmentId ? prisma.iCPSegment.findUnique({ where: { id: profile.segmentId }, select: { id: true, name: true } }) : null,
+    profile.personaId ? prisma.persona.findUnique({ where: { id: profile.personaId }, select: { id: true, name: true } }) : null,
+    prisma.radarScanCursor.count({ where: { profileId } }),
+  ]);
+  
+  return {
+    ...profile,
+    keywords: (profile.keywords || {}) as Record<string, string[]>,
+    negativeKeywords: profile.negativeKeywords as string[] | null,
+    enabledChannels: profile.enabledChannels as string[],
+    runStats: profile.runStats as RadarSearchProfileData['runStats'],
+    exclusionRules: profile.exclusionRules as Record<string, unknown> | null,
+    segment,
+    persona,
+    _count: { cursors: cursorCount },
+  };
+}
+
+/**
+ * 创建扫描计划
+ */
+export async function createRadarSearchProfile(input: CreateRadarSearchProfileInput): Promise<RadarSearchProfileData> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  // 计算初始 nextRunAt
+  let nextRunAt: Date | null = null;
+  if (input.scheduleRule) {
+    try {
+      const { CronExpressionParser } = await import('cron-parser');
+      const interval = CronExpressionParser.parse(input.scheduleRule);
+      nextRunAt = interval.next().toDate();
+    } catch {
+      // 默认 1 小时后
+      nextRunAt = new Date(Date.now() + 60 * 60 * 1000);
+    }
+  }
+  
+  const profile = await prisma.radarSearchProfile.create({
+    data: {
+      tenantId: session.user.tenantId,
+      name: input.name,
+      description: input.description,
+      segmentId: input.segmentId,
+      personaId: input.personaId,
+      keywords: (input.keywords || { en: [] }) as Prisma.InputJsonValue,
+      negativeKeywords: input.negativeKeywords as Prisma.InputJsonValue,
+      targetCountries: input.targetCountries || [],
+      targetRegions: input.targetRegions || [],
+      industryCodes: input.industryCodes || [],
+      categoryFilters: input.categoryFilters || [],
+      enabledChannels: (input.enabledChannels || []) as never[],
+      sourceIds: input.sourceIds || [],
+      scheduleRule: input.scheduleRule || '0 6 * * *',
+      maxRunSeconds: input.maxRunSeconds || 45,
+      autoQualify: input.autoQualify ?? true,
+      autoEnrich: input.autoEnrich ?? false,
+      nextRunAt,
+      isActive: true,
+    },
+  });
+  
+  return {
+    ...profile,
+    keywords: (profile.keywords || {}) as Record<string, string[]>,
+    negativeKeywords: profile.negativeKeywords as string[] | null,
+    enabledChannels: profile.enabledChannels as string[],
+    runStats: null,
+    exclusionRules: null,
+    segment: null,
+    persona: null,
+    _count: { cursors: 0 },
+  };
+}
+
+/**
+ * 更新扫描计划
+ */
+export async function updateRadarSearchProfile(
+  profileId: string,
+  input: Partial<CreateRadarSearchProfileInput> & { isActive?: boolean }
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  // 修改 scheduleRule 需要决策者权限
+  if (input.scheduleRule !== undefined) {
+    const roleCheck = requireDecider(session);
+    if (!roleCheck.authorized) {
+      throw new Error(roleCheck.error);
+    }
+  }
+  
+  const existing = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!existing || existing.tenantId !== session.user.tenantId) {
+    throw new Error('Profile not found');
+  }
+  
+  const data: Record<string, unknown> = {};
+  
+  if (input.name !== undefined) data.name = input.name;
+  if (input.description !== undefined) data.description = input.description;
+  if (input.segmentId !== undefined) data.segmentId = input.segmentId;
+  if (input.personaId !== undefined) data.personaId = input.personaId;
+  if (input.keywords !== undefined) data.keywords = input.keywords as Prisma.InputJsonValue;
+  if (input.negativeKeywords !== undefined) data.negativeKeywords = input.negativeKeywords as Prisma.InputJsonValue;
+  if (input.targetCountries !== undefined) data.targetCountries = input.targetCountries;
+  if (input.targetRegions !== undefined) data.targetRegions = input.targetRegions;
+  if (input.industryCodes !== undefined) data.industryCodes = input.industryCodes;
+  if (input.categoryFilters !== undefined) data.categoryFilters = input.categoryFilters;
+  if (input.enabledChannels !== undefined) data.enabledChannels = input.enabledChannels as never[];
+  if (input.sourceIds !== undefined) data.sourceIds = input.sourceIds;
+  if (input.maxRunSeconds !== undefined) data.maxRunSeconds = input.maxRunSeconds;
+  if (input.autoQualify !== undefined) data.autoQualify = input.autoQualify;
+  if (input.autoEnrich !== undefined) data.autoEnrich = input.autoEnrich;
+  if (input.isActive !== undefined) data.isActive = input.isActive;
+  
+  // 如果修改了 scheduleRule，重新计算 nextRunAt
+  if (input.scheduleRule !== undefined) {
+    data.scheduleRule = input.scheduleRule;
+    try {
+      const { CronExpressionParser } = await import('cron-parser');
+      const interval = CronExpressionParser.parse(input.scheduleRule);
+      data.nextRunAt = interval.next().toDate();
+    } catch {
+      data.nextRunAt = new Date(Date.now() + 60 * 60 * 1000);
+    }
+  }
+  
+  await prisma.radarSearchProfile.update({
+    where: { id: profileId },
+    data,
+  });
+}
+
+/**
+ * 切换扫描计划启用状态
+ */
+export async function toggleRadarSearchProfileActive(profileId: string): Promise<boolean> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  const existing = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!existing || existing.tenantId !== session.user.tenantId) {
+    throw new Error('Profile not found');
+  }
+  
+  const newActive = !existing.isActive;
+  
+  // 如果重新启用，计算新的 nextRunAt
+  let nextRunAt = existing.nextRunAt;
+  if (newActive && !existing.nextRunAt) {
+    try {
+      const { CronExpressionParser } = await import('cron-parser');
+      const interval = CronExpressionParser.parse(existing.scheduleRule);
+      nextRunAt = interval.next().toDate();
+    } catch {
+      nextRunAt = new Date(Date.now() + 60 * 60 * 1000);
+    }
+  }
+  
+  await prisma.radarSearchProfile.update({
+    where: { id: profileId },
+    data: { 
+      isActive: newActive,
+      nextRunAt: newActive ? nextRunAt : null,
+      // 清除锁状态
+      lockToken: null,
+      lockedAt: null,
+      lockedBy: null,
+    },
+  });
+  
+  return newActive;
+}
+
+/**
+ * 删除扫描计划
+ */
+export async function deleteRadarSearchProfile(profileId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
+  
+  const existing = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!existing || existing.tenantId !== session.user.tenantId) {
+    throw new Error('Profile not found');
+  }
+  
+  // 先删除关联的游标
+  await prisma.radarScanCursor.deleteMany({
+    where: { profileId },
+  });
+  
+  await prisma.radarSearchProfile.delete({
+    where: { id: profileId },
+  });
+}
+
+/**
+ * 获取扫描计划的游标状态
+ */
+export async function getRadarSearchProfileCursors(profileId: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  const profile = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!profile || profile.tenantId !== session.user.tenantId) {
+    throw new Error('Profile not found');
+  }
+  
+  const cursors = await prisma.radarScanCursor.findMany({
+    where: { profileId },
+    orderBy: { lastScanAt: 'desc' },
+  });
+  
+  // 获取 source 名称
+  const sourceIds = cursors.map(c => c.sourceId);
+  const sources = await prisma.radarSource.findMany({
+    where: { id: { in: sourceIds } },
+    select: { id: true, name: true, code: true },
+  });
+  const sourceMap = new Map(sources.map(s => [s.id, s]));
+  
+  return cursors.map(c => ({
+    ...c,
+    cursorState: c.cursorState as Record<string, unknown>,
+    source: sourceMap.get(c.sourceId) || null,
+  }));
+}
+
+/**
+ * 手动触发扫描
+ */
+export async function triggerRadarSearchProfileScan(profileId: string): Promise<{ success: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  
+  const profile = await prisma.radarSearchProfile.findUnique({
+    where: { id: profileId },
+  });
+  
+  if (!profile || profile.tenantId !== session.user.tenantId) {
+    throw new Error('Profile not found');
+  }
+  
+  // 检查是否已被锁定
+  if (profile.lockToken && profile.lockedAt) {
+    const lockAge = Date.now() - profile.lockedAt.getTime();
+    if (lockAge < 5 * 60 * 1000) {
+      return { success: false, message: '扫描正在进行中，请稍后再试' };
+    }
+  }
+  
+  // 设置 nextRunAt 为现在，让调度器立即拾取
+  await prisma.radarSearchProfile.update({
+    where: { id: profileId },
+    data: { 
+      nextRunAt: new Date(),
+      isActive: true,
+    },
+  });
+  
+  return { success: true, message: '已触发扫描，调度器将在下一个周期执行' };
 }
 
 // ==================== 清理 ====================

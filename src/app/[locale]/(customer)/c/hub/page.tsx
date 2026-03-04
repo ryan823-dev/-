@@ -19,6 +19,12 @@ import {
   Zap,
   TrendingUp,
   X,
+  MessageSquare,
+  ListTodo,
+  LayoutGrid,
+  Check,
+  Play,
+  Pause,
 } from 'lucide-react';
 import {
   getSystemTodos,
@@ -30,6 +36,17 @@ import {
   type ModuleHealth,
   type RecentActivity,
 } from '@/actions/hub';
+import {
+  getAllTasks,
+  getAllComments,
+  updateTaskStatus,
+  resolveComment,
+  getCollaborationStats,
+  type TaskData,
+  type CommentData,
+} from '@/actions/collaboration';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 // Icon mapping
 const MODULE_ICONS: Record<string, typeof Brain> = {
@@ -39,29 +56,45 @@ const MODULE_ICONS: Record<string, typeof Brain> = {
   globe: Globe,
 };
 
+type ActiveTab = 'todos' | 'tasks' | 'comments';
+
 export default function HubPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('todos');
+  
+  // System data
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [stats, setStats] = useState<HubStats>({ pending: 0, blocked: 0, inProgress: 0, completed: 0 });
   const [moduleHealth, setModuleHealth] = useState<ModuleHealth[]>([]);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
+  
+  // Collaboration data
+  const [tasks, setTasks] = useState<Array<TaskData & { entityType: string; entityId: string }>>([]);
+  const [comments, setComments] = useState<Array<CommentData & { entityType: string; entityId: string }>>([]);
+  const [collabStats, setCollabStats] = useState({ openComments: 0, openTasks: 0, inProgressTasks: 0, completedTasksToday: 0 });
 
   // 加载数据
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [todosData, statsData, healthData, activityData] = await Promise.all([
+      const [todosData, statsData, healthData, activityData, tasksData, commentsData, collabStatsData] = await Promise.all([
         getSystemTodos(),
         getHubStats(),
         getModuleHealth(),
         getRecentActivity(5),
+        getAllTasks({ status: 'all' }),
+        getAllComments(20),
+        getCollaborationStats(),
       ]);
       setTodos(todosData);
       setStats(statsData);
       setModuleHealth(healthData);
       setActivities(activityData);
+      setTasks(tasksData);
+      setComments(commentsData);
+      setCollabStats(collabStatsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载数据失败');
     } finally {
@@ -73,6 +106,28 @@ export default function HubPage() {
     loadData();
   }, [loadData]);
 
+  // Handle task status change
+  const handleTaskStatusChange = async (taskId: string, newStatus: TaskData['status']) => {
+    try {
+      await updateTaskStatus(taskId, newStatus);
+      toast.success('任务状态已更新');
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '更新失败');
+    }
+  };
+
+  // Handle resolve comment
+  const handleResolveComment = async (commentId: string) => {
+    try {
+      await resolveComment(commentId);
+      toast.success('评论已解决');
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败');
+    }
+  };
+
   // 获取优先级样式
   const getPriorityStyle = (priority: string) => {
     const styles: Record<string, string> = {
@@ -80,6 +135,10 @@ export default function HubPage() {
       P1: 'bg-amber-100 text-amber-600',
       P2: 'bg-blue-100 text-blue-600',
       P3: 'bg-slate-100 text-slate-600',
+      urgent: 'bg-red-100 text-red-600',
+      high: 'bg-amber-100 text-amber-600',
+      medium: 'bg-blue-100 text-blue-600',
+      low: 'bg-slate-100 text-slate-600',
     };
     return styles[priority] || styles.P3;
   };
@@ -90,6 +149,9 @@ export default function HubPage() {
       pending: { label: '待处理', color: 'bg-amber-50 text-amber-600' },
       in_progress: { label: '进行中', color: 'bg-blue-50 text-blue-600' },
       completed: { label: '已完成', color: 'bg-emerald-50 text-emerald-600' },
+      open: { label: '待处理', color: 'bg-amber-50 text-amber-600' },
+      done: { label: '已完成', color: 'bg-emerald-50 text-emerald-600' },
+      cancelled: { label: '已取消', color: 'bg-slate-50 text-slate-600' },
     };
     return styles[status] || styles.pending;
   };
@@ -109,6 +171,19 @@ export default function HubPage() {
     return MODULE_ICONS[iconName] || ClipboardList;
   };
 
+  // 获取实体类型标签
+  const getEntityLabel = (entityType: string) => {
+    const labels: Record<string, string> = {
+      SeoContent: '内容',
+      Evidence: '证据',
+      CompanyProfile: '企业画像',
+      BrandGuideline: '品牌规范',
+      Persona: '人设',
+      ContentBrief: '内容规划',
+    };
+    return labels[entityType] || entityType;
+  };
+
   // 获取活动描述
   const getActivityDescription = (activity: RecentActivity) => {
     const actionMap: Record<string, string> = {
@@ -117,6 +192,11 @@ export default function HubPage() {
       delete: '删除了',
       publish: '发布了',
       analyze: '分析了',
+      'evidence.created': '创建了',
+      'evidence.updated': '更新了',
+      'version.created': '创建了版本',
+      'comment.added': '添加了评论',
+      'task.created': '创建了任务',
     };
     const entityMap: Record<string, string> = {
       lead: '线索',
@@ -124,6 +204,10 @@ export default function HubPage() {
       post: '社媒帖子',
       profile: '企业画像',
       asset: '素材',
+      Evidence: '证据',
+      ArtifactVersion: '版本',
+      ArtifactComment: '评论',
+      ArtifactTask: '任务',
     };
     return `${actionMap[activity.action] || activity.action} ${entityMap[activity.entityType] || activity.entityType}`;
   };
@@ -142,7 +226,7 @@ export default function HubPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#0B1B2B]">推进中台</h1>
-          <p className="text-sm text-slate-500 mt-1">任务跟踪与待办事项管理</p>
+          <p className="text-sm text-slate-500 mt-1">任务协作、评论审批、进度跟踪</p>
         </div>
         <button 
           onClick={loadData}
@@ -166,10 +250,10 @@ export default function HubPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: '待处理', value: stats.pending, icon: Clock, color: 'text-amber-500' },
-          { label: 'P0阻塞', value: stats.blocked, icon: AlertCircle, color: 'text-red-500' },
-          { label: '进行中', value: stats.inProgress, icon: ArrowRight, color: 'text-blue-500' },
-          { label: '已完成', value: stats.completed, icon: CheckCircle2, color: 'text-emerald-500' },
+          { label: '待办事项', value: stats.pending, icon: Clock, color: 'text-amber-500' },
+          { label: '待处理任务', value: collabStats.openTasks, icon: ListTodo, color: 'text-blue-500' },
+          { label: '进行中任务', value: collabStats.inProgressTasks, icon: Play, color: 'text-purple-500' },
+          { label: '待解决评论', value: collabStats.openComments, icon: MessageSquare, color: 'text-emerald-500' },
         ].map((stat) => (
           <div key={stat.label} className="bg-[#FFFCF6] rounded-xl border border-[#E7E0D3] p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -181,61 +265,235 @@ export default function HubPage() {
         ))}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-[#E7E0D3] pb-2">
+        {[
+          { id: 'todos' as const, label: '系统待办', icon: ClipboardList, count: todos.length },
+          { id: 'tasks' as const, label: '协作任务', icon: ListTodo, count: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').length },
+          { id: 'comments' as const, label: '评论审批', icon: MessageSquare, count: comments.length },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-[#C7A56A] text-[#0B1B2B]'
+                : 'text-slate-500 hover:bg-[#F7F3EA]'
+            }`}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+            {tab.count > 0 && (
+              <span className={`px-1.5 py-0.5 rounded text-xs ${
+                activeTab === tab.id ? 'bg-[#0B1B2B]/20' : 'bg-slate-200'
+              }`}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-3 gap-6">
-        {/* Todo List */}
+        {/* Main Content */}
         <div className="col-span-2 bg-[#FFFCF6] rounded-2xl border border-[#E7E0D3] p-6">
-          <h3 className="font-bold text-[#0B1B2B] mb-4 flex items-center gap-2">
-            <ClipboardList size={18} className="text-[#C7A56A]" />
-            待办事项
-          </h3>
-          
-          {todos.length === 0 ? (
-            <div className="text-center py-16">
-              <CheckCircle2 size={48} className="text-emerald-300 mx-auto mb-4" />
-              <p className="text-lg font-medium text-[#0B1B2B] mb-2">太棒了！</p>
-              <p className="text-slate-500">没有待处理事项</p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[500px] overflow-y-auto">
-              {todos.map((todo) => {
-                const Icon = getModuleIcon(todo.moduleIcon);
-                const statusInfo = getStatusStyle(todo.status);
-                return (
-                  <div 
-                    key={todo.id} 
-                    className="flex items-center gap-4 p-4 bg-white border border-[#E7E0D3] rounded-xl hover:border-[#C7A56A]/30 transition-colors"
-                  >
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded ${getPriorityStyle(todo.priority)}`}>
-                      {todo.priority}
-                    </span>
-                    <div className="w-8 h-8 bg-[#F7F3EA] rounded-lg flex items-center justify-center">
-                      <Icon size={16} className="text-[#C7A56A]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-[#0B1B2B]">{todo.title}</h4>
-                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{todo.description}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">来自：{todo.module}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded ${statusInfo.color}`}>
-                      {statusInfo.label}
-                    </span>
-                    {todo.actionLink ? (
-                      <Link 
-                        href={todo.actionLink}
-                        className="px-4 py-2 bg-[#C7A56A] text-[#0B1B2B] text-xs font-bold rounded-lg hover:bg-[#C7A56A]/90 transition-colors flex items-center gap-1"
+          {/* System Todos Tab */}
+          {activeTab === 'todos' && (
+            <>
+              <h3 className="font-bold text-[#0B1B2B] mb-4 flex items-center gap-2">
+                <ClipboardList size={18} className="text-[#C7A56A]" />
+                系统待办事项
+              </h3>
+              
+              {todos.length === 0 ? (
+                <div className="text-center py-16">
+                  <CheckCircle2 size={48} className="text-emerald-300 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-[#0B1B2B] mb-2">太棒了！</p>
+                  <p className="text-slate-500">没有待处理事项</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {todos.map((todo) => {
+                    const Icon = getModuleIcon(todo.moduleIcon);
+                    const statusInfo = getStatusStyle(todo.status);
+                    return (
+                      <div 
+                        key={todo.id} 
+                        className="flex items-center gap-4 p-4 bg-white border border-[#E7E0D3] rounded-xl hover:border-[#C7A56A]/30 transition-colors"
                       >
-                        {todo.action}
-                        <ChevronRight size={12} />
-                      </Link>
-                    ) : (
-                      <button className="px-4 py-2 bg-[#C7A56A] text-[#0B1B2B] text-xs font-bold rounded-lg hover:bg-[#C7A56A]/90 transition-colors">
-                        {todo.action}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${getPriorityStyle(todo.priority)}`}>
+                          {todo.priority}
+                        </span>
+                        <div className="w-8 h-8 bg-[#F7F3EA] rounded-lg flex items-center justify-center">
+                          <Icon size={16} className="text-[#C7A56A]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-[#0B1B2B]">{todo.title}</h4>
+                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{todo.description}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">来自：{todo.module}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                        {todo.actionLink ? (
+                          <Link 
+                            href={todo.actionLink}
+                            className="px-4 py-2 bg-[#C7A56A] text-[#0B1B2B] text-xs font-bold rounded-lg hover:bg-[#C7A56A]/90 transition-colors flex items-center gap-1"
+                          >
+                            {todo.action}
+                            <ChevronRight size={12} />
+                          </Link>
+                        ) : (
+                          <button className="px-4 py-2 bg-[#C7A56A] text-[#0B1B2B] text-xs font-bold rounded-lg hover:bg-[#C7A56A]/90 transition-colors">
+                            {todo.action}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && (
+            <>
+              <h3 className="font-bold text-[#0B1B2B] mb-4 flex items-center gap-2">
+                <ListTodo size={18} className="text-[#C7A56A]" />
+                协作任务
+              </h3>
+              
+              {tasks.length === 0 ? (
+                <div className="text-center py-16">
+                  <ListTodo size={48} className="text-slate-300 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-[#0B1B2B] mb-2">暂无任务</p>
+                  <p className="text-slate-500">在内容编辑器中创建协作任务</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {tasks.map((task) => {
+                    const statusInfo = getStatusStyle(task.status);
+                    return (
+                      <div 
+                        key={task.id} 
+                        className="flex items-center gap-4 p-4 bg-white border border-[#E7E0D3] rounded-xl hover:border-[#C7A56A]/30 transition-colors"
+                      >
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${getPriorityStyle(task.priority)}`}>
+                          {task.priority}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-[#0B1B2B]">{task.title}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-slate-400 bg-[#F7F3EA] px-1.5 py-0.5 rounded">
+                              {getEntityLabel(task.entityType)}
+                            </span>
+                            {task.assigneeName && (
+                              <span className="text-[10px] text-slate-500">
+                                指派给: {task.assigneeName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {task.status === 'open' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleTaskStatusChange(task.id, 'in_progress')}
+                              className="text-blue-500 hover:bg-blue-50"
+                            >
+                              <Play size={14} />
+                            </Button>
+                          )}
+                          {task.status === 'in_progress' && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleTaskStatusChange(task.id, 'open')}
+                                className="text-amber-500 hover:bg-amber-50"
+                              >
+                                <Pause size={14} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleTaskStatusChange(task.id, 'done')}
+                                className="text-emerald-500 hover:bg-emerald-50"
+                              >
+                                <Check size={14} />
+                              </Button>
+                            </>
+                          )}
+                          {task.status === 'done' && (
+                            <CheckCircle2 size={18} className="text-emerald-500" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Comments Tab */}
+          {activeTab === 'comments' && (
+            <>
+              <h3 className="font-bold text-[#0B1B2B] mb-4 flex items-center gap-2">
+                <MessageSquare size={18} className="text-[#C7A56A]" />
+                待解决评论
+              </h3>
+              
+              {comments.length === 0 ? (
+                <div className="text-center py-16">
+                  <MessageSquare size={48} className="text-slate-300 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-[#0B1B2B] mb-2">暂无评论</p>
+                  <p className="text-slate-500">所有评论已解决</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {comments.map((comment) => (
+                    <div 
+                      key={comment.id} 
+                      className="flex items-start gap-4 p-4 bg-white border border-[#E7E0D3] rounded-xl hover:border-[#C7A56A]/30 transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-[#F7F3EA] rounded-full flex items-center justify-center shrink-0">
+                        <MessageSquare size={14} className="text-[#C7A56A]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[#0B1B2B]">{comment.content}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] text-slate-500">
+                            {comment.authorName || '未知用户'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">•</span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(comment.createdAt).toLocaleString('zh-CN')}
+                          </span>
+                          <span className="text-[10px] text-slate-400 bg-[#F7F3EA] px-1.5 py-0.5 rounded">
+                            {getEntityLabel(comment.entityType)}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleResolveComment(comment.id)}
+                        className="text-emerald-500 hover:bg-emerald-50 shrink-0"
+                      >
+                        <Check size={14} className="mr-1" />
+                        解决
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -295,9 +553,11 @@ export default function HubPage() {
           <div className="bg-gradient-to-br from-[#0B1B2B] to-[#152942] rounded-2xl p-6 text-white">
             <h3 className="font-bold mb-2">💡 今日建议</h3>
             <p className="text-xs text-white/70 leading-relaxed">
-              {todos.length > 0 
-                ? `您有 ${todos.filter(t => t.priority === 'P0' || t.priority === 'P1').length} 个高优先级任务待处理，建议先完成这些任务。`
-                : '所有任务已完成！可以考虑通过AI调研发掘新的潜在客户。'
+              {collabStats.openTasks > 0 
+                ? `您有 ${collabStats.openTasks} 个待处理任务，${collabStats.openComments} 条待解决评论。建议及时处理以推进协作进度。`
+                : todos.length > 0 
+                  ? `您有 ${todos.filter(t => t.priority === 'P0' || t.priority === 'P1').length} 个高优先级待办事项待处理。`
+                  : '所有任务已完成！可以考虑通过AI调研发掘新的潜在客户。'
               }
             </p>
           </div>

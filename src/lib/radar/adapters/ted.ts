@@ -57,9 +57,12 @@ export class TEDAdapter implements RadarAdapter {
       queryParts.push(`ISO_COUNTRY_CODE:(${query.countries.join(' OR ')})`);
     }
     
-    // 日期过滤
-    if (query.publishedAfter) {
-      const dateStr = query.publishedAfter.toISOString().split('T')[0].replace(/-/g, '');
+    // 日期过滤 — 游标优先
+    const publishedAfter = query.cursor?.since 
+      ? new Date(query.cursor.since) 
+      : query.publishedAfter;
+    if (publishedAfter) {
+      const dateStr = publishedAfter.toISOString().split('T')[0].replace(/-/g, '');
       queryParts.push(`PD>=${dateStr}`);
     }
     if (query.deadlineAfter) {
@@ -69,9 +72,12 @@ export class TEDAdapter implements RadarAdapter {
 
     const searchQuery = queryParts.length > 0 ? queryParts.join(' AND ') : '*';
     
+    // 游标支持：优先使用 cursor 中的分页
+    const page = query.cursor?.nextPage ?? query.page ?? 0;
+    
     const requestBody = {
       q: searchQuery,
-      page: (query.page || 0) + 1,  // TED 页码从 1 开始
+      page: page + 1,  // TED 页码从 1 开始
       limit: Math.min(query.pageSize || 20, 100),
       scope: 'ALL',
       sortField: 'PD',
@@ -120,6 +126,11 @@ export class TEDAdapter implements RadarAdapter {
           fetchedAt: new Date(),
           duration,
         },
+        // 持续扫描游标
+        nextCursor: hasMore
+          ? { nextPage: page + 1, since: query.cursor?.since }
+          : undefined,
+        isExhausted: !hasMore,
       };
     } catch (error) {
       clearTimeout(timeoutId);

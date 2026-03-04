@@ -365,3 +365,130 @@ export async function getBriefStats(): Promise<{
 
   return { total, draft, ready, inProgress, done };
 }
+
+// ==================== Batch: Create from TopicCluster ====================
+
+export type ContentMapItem = {
+  type: string;
+  title: string;
+  briefGoal: string;
+  funnel: string;
+  intent: string;
+  mustUseEvidenceIds?: string[];
+  pillar?: string;
+  clusterIndex?: number;
+  itemIndex?: number;
+};
+
+export type BatchBriefResult = {
+  success: boolean;
+  created: number;
+  errors: string[];
+  briefs: BriefListItem[];
+};
+
+/**
+ * 从 TopicCluster 批量创建 ContentBrief
+ * @param items 选中的 contentMap items
+ * @param targetPersonaId 可选的目标 Persona
+ */
+export async function createBriefsFromTopicCluster(
+  items: ContentMapItem[],
+  targetPersonaId?: string
+): Promise<BatchBriefResult> {
+  const session = await getSession();
+  
+  const errors: string[] = [];
+  const createdBriefs: BriefListItem[] = [];
+  
+  // Map intent from TopicCluster format to ContentBrief format
+  const mapIntent = (intent: string): SearchIntent => {
+    const normalized = intent.toLowerCase();
+    if (normalized.includes('commercial') || normalized.includes('商业')) return 'commercial';
+    if (normalized.includes('transactional') || normalized.includes('交易')) return 'transactional';
+    if (normalized.includes('navigational') || normalized.includes('导航')) return 'navigational';
+    return 'informational';
+  };
+  
+  // Process each item
+  for (const item of items) {
+    try {
+      // Generate target keywords from title and type
+      const keywords: string[] = [];
+      
+      // Extract keywords from title (split by common separators)
+      const titleWords = item.title.split(/[：:,，\-–—\s]+/).filter(w => w.length > 1);
+      keywords.push(...titleWords.slice(0, 3));
+      
+      // Add type as keyword if relevant
+      if (item.type && !keywords.some(k => k.toLowerCase() === item.type.toLowerCase())) {
+        keywords.push(item.type);
+      }
+      
+      // Add pillar if provided
+      if (item.pillar && !keywords.some(k => k === item.pillar)) {
+        keywords.push(item.pillar);
+      }
+      
+      const brief = await prisma.contentBrief.create({
+        data: {
+          tenantId: session.user.tenantId,
+          title: item.title,
+          targetPersonaId: targetPersonaId || null,
+          targetKeywords: keywords.slice(0, 5), // Limit to 5 keywords
+          intent: mapIntent(item.intent),
+          cta: null,
+          evidenceIds: item.mustUseEvidenceIds || [],
+          notes: `${item.briefGoal}\n\n来源：TopicCluster / ${item.pillar || '未分类'}\n漏斗阶段：${item.funnel}\n内容类型：${item.type}`,
+          status: "draft",
+          createdById: session.user.id,
+        },
+        include: {
+          targetPersona: { select: { name: true } },
+        },
+      });
+      
+      createdBriefs.push({
+        id: brief.id,
+        title: brief.title,
+        targetKeywords: brief.targetKeywords,
+        intent: brief.intent as SearchIntent,
+        status: brief.status,
+        targetPersonaId: brief.targetPersonaId,
+        targetPersonaName: brief.targetPersona?.name || undefined,
+        createdAt: brief.createdAt,
+        updatedAt: brief.updatedAt,
+      });
+    } catch (err) {
+      errors.push(`创建 "${item.title}" 失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    }
+  }
+  
+  // Log batch activity
+  if (createdBriefs.length > 0) {
+    logActivity({
+      tenantId: session.user.tenantId,
+      userId: session.user.id,
+      action: "brief.batch_created",
+      entityType: "ContentBrief",
+      entityId: createdBriefs[0].id,
+      eventCategory: EVENT_CATEGORIES.MARKETING,
+      severity: "info",
+      context: { 
+        totalCreated: createdBriefs.length, 
+        totalRequested: items.length,
+        errors: errors.length,
+        source: 'TopicCluster',
+      },
+    });
+  }
+  
+  revalidatePath("/c/marketing");
+  
+  return {
+    success: errors.length === 0,
+    created: createdBriefs.length,
+    errors,
+    briefs: createdBriefs,
+  };
+}

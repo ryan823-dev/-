@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { aiClient } from "@/lib/ai-client";
+import { requireDecider } from "@/lib/permissions";
 
 // ===================== Types =====================
 
@@ -458,6 +459,10 @@ export async function updateContentStatus(
 export async function deleteContent(contentId: string): Promise<boolean> {
   const session = await auth();
   if (!session?.user?.id) return false;
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

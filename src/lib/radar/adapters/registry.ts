@@ -10,6 +10,9 @@ import type {
 import { UNGMAdapter } from './ungm';
 import { TEDAdapter } from './ted';
 import { AISearchAdapter } from './ai-search';
+import { GooglePlacesAdapter } from './google-places';
+import { BraveSearchAdapter } from './brave-search';
+import { GenericFeedAdapter } from './generic-feed';
 
 // ==================== 适配器注册表 ====================
 
@@ -166,6 +169,96 @@ export function ensureAdaptersInitialized(): void {
     (config) => new AISearchAdapter(config)
   );
   
+  // 注册 Google Places 适配器
+  registerAdapter(
+    {
+      code: 'google_places',
+      name: 'Google Maps - 企业发现',
+      channelType: 'MAPS',
+      adapterType: 'API',
+      description: '通过 Google Maps Places API 发现目标区域的潜在客户公司',
+      features: {
+        supportsKeywordSearch: true,
+        supportsCategoryFilter: true,
+        supportsDateFilter: false,
+        supportsRegionFilter: true,
+        supportsPagination: true,
+        supportsDetails: true,
+        maxResultsPerQuery: 60,
+        rateLimit: { requests: 100, windowMs: 60000 },
+      },
+      defaultConfig: {
+        timeout: 30000,
+      },
+      storagePolicy: 'TTL_CACHE',
+      ttlDays: 90,
+      attributionRequired: true,
+      isOfficial: true,
+      websiteUrl: 'https://developers.google.com/maps/documentation/places',
+    },
+    (config) => new GooglePlacesAdapter(config)
+  );
+  
+  // 注册 Brave Search 适配器
+  registerAdapter(
+    {
+      code: 'brave_search',
+      name: 'Brave Search - B2B 发现',
+      channelType: 'DIRECTORY',
+      adapterType: 'AI_SEARCH',
+      description: '使用 Brave Search + AI 从互联网发现目标公司',
+      features: {
+        supportsKeywordSearch: true,
+        supportsCategoryFilter: false,
+        supportsDateFilter: false,
+        supportsRegionFilter: true,
+        supportsPagination: false,
+        supportsDetails: false,
+        maxResultsPerQuery: 30,
+        rateLimit: { requests: 15, windowMs: 60000 },
+      },
+      defaultConfig: {
+        timeout: 30000,
+      },
+      storagePolicy: 'TTL_CACHE',
+      ttlDays: 60,
+      attributionRequired: false,
+      isOfficial: false,
+      websiteUrl: 'https://brave.com/search/api/',
+    },
+    (config) => new BraveSearchAdapter(config)
+  );
+  
+  // 注册 Generic Feed 适配器
+  registerAdapter(
+    {
+      code: 'generic_feed',
+      name: 'Generic Feed - RSS/JSON',
+      channelType: 'TENDER',
+      adapterType: 'RSS',
+      description: 'RSS/JSON 通用 Feed 适配器，支持自定义字段映射',
+      features: {
+        supportsKeywordSearch: false,
+        supportsCategoryFilter: false,
+        supportsDateFilter: false,
+        supportsRegionFilter: false,
+        supportsPagination: false,
+        supportsDetails: false,
+        maxResultsPerQuery: 100,
+        rateLimit: { requests: 10, windowMs: 60000 },
+      },
+      defaultConfig: {
+        timeout: 30000,
+      },
+      storagePolicy: 'TTL_CACHE',
+      ttlDays: 60,
+      attributionRequired: true,
+      isOfficial: false,
+      websiteUrl: undefined,
+    },
+    (config) => new GenericFeedAdapter(config)
+  );
+  
   initialized = true;
 }
 
@@ -175,9 +268,11 @@ export const ADAPTER_CODES = {
   UNGM: 'ungm',
   TED: 'ted',
   AI_SEARCH: 'ai_search',
+  GOOGLE_PLACES: 'google_places',
+  BRAVE_SEARCH: 'brave_search',
+  GENERIC_FEED: 'generic_feed',
   // 后续扩展
   SAM_GOV: 'sam_gov',
-  GOOGLE_PLACES: 'google_places',
   CSV_IMPORT: 'csv_import',
 } as const;
 

@@ -33,6 +33,14 @@ export interface RadarSearchQuery {
   targetIndustries?: string[];
   companyTypes?: string[];  // manufacturer | distributor | service_provider
   locationBias?: { lat: number; lng: number; radius: number };
+  // === 持续扫描游标 ===
+  cursor?: {
+    nextPage?: number;
+    nextPageToken?: string;
+    since?: string;        // ISO8601
+    queryIndex?: number;
+  };
+  maxResults?: number;     // 本次最多抓取条数
 }
 
 // ==================== 搜索结果 ====================
@@ -48,6 +56,14 @@ export interface RadarSearchResult {
     fetchedAt: Date;
     duration: number;
   };
+  // === 持续扫描游标 ===
+  nextCursor?: {
+    nextPage?: number;
+    nextPageToken?: string;
+    since?: string;        // ISO8601
+    queryIndex?: number;
+  };
+  isExhausted?: boolean;   // 该查询维度已无更多数据
 }
 
 // ==================== 标准化候选 ====================

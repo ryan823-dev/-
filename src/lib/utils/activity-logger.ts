@@ -75,11 +75,16 @@ export const ACTIVITY_ACTIONS = {
   // Chat
   CHAT_CONVERSATION_CREATED: "chat.conversation_created",
   CHAT_MESSAGE_SENT: "chat.message_sent",
+
+  // Skills
+  SKILL_EXECUTED: "skill.executed",
+  SKILL_CHAIN_EXECUTED: "skill.chain_executed",
 } as const;
 
 export const EVENT_CATEGORIES = {
   KNOWLEDGE: "knowledge",
   MARKETING: "marketing",
+  RADAR: "radar",
   REVIEW: "review",
   CHAT: "chat",
   SYSTEM: "system",

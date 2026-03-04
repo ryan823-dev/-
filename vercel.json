@@ -1,0 +1,10 @@
+{
+  "crons": [
+    { "path": "/api/cron/radar-scan", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/radar-qualify", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/radar-enrich", "schedule": "0 * * * *" },
+    { "path": "/api/cron/radar-cleanup", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/push-timeout", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" }
+  ]
+}

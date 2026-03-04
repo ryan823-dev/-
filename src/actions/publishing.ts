@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { createPublisherAdapter, mapVertaxToPaintcell } from "@/lib/publishers";
 import type { PaintcellResourceCategory } from "@/lib/publishers";
 import type { PushRecordData, WebsiteConfigData } from "./publishing.types";
+import { requireDecider } from "@/lib/permissions";
 
 // ===================== 获取网站配置 =====================
 
@@ -56,6 +57,10 @@ export async function pushContentToWebsite(
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "未登录" };
+  }
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    return { success: false, error: roleCheck.error };
   }
 
   const user = await prisma.user.findUnique({
@@ -142,7 +147,7 @@ export async function pushContentToWebsite(
       remoteId: result.remoteId || null,
       remoteSlug: result.remoteSlug || null,
       targetUrl: result.remoteSlug
-        ? `${websiteConfig.url || ""}/en/resources/engineering-library/${result.remoteSlug}`
+        ? `${websiteConfig.url || ""}/en/resources/articles/${result.remoteSlug}`
         : null,
       pushPayload: JSON.parse(JSON.stringify(payload)),
       pushedAt: now,
@@ -155,7 +160,7 @@ export async function pushContentToWebsite(
       remoteId: result.remoteId || null,
       remoteSlug: result.remoteSlug || null,
       targetUrl: result.remoteSlug
-        ? `${websiteConfig.url || ""}/en/resources/engineering-library/${result.remoteSlug}`
+        ? `${websiteConfig.url || ""}/en/resources/articles/${result.remoteSlug}`
         : null,
       pushPayload: JSON.parse(JSON.stringify(payload)),
       pushedAt: now,

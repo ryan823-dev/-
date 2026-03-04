@@ -1,244 +1,178 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
-  Home,
-  Library,
-  BarChart3,
-  Globe,
-  Radar,
-  ClipboardList,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ChevronDown,
-  FileStack,
-  ShieldCheck,
-  Building2,
-  BookOpen,
-  Users2,
-  FileEdit,
-  Layers,
-} from 'lucide-react';
+  getSortedGroups,
+  getNavItemsByGroup,
+  getSortedSubItems,
+  type NavItem,
+  type NavGroupKey,
+  type HealthIndicator,
+} from '@/config/nav';
 
-export enum CustomerNavItem {
-  StrategicHome = 'strategic-home',
-  KnowledgeEngine = 'knowledge',
-  OutreachRadar = 'radar',
-  MarketingDrive = 'marketing',
-  SocialPresence = 'social',
-  PromotionHub = 'hub',
-}
-
-interface SubNavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-}
-
-interface NavItemConfig {
-  id: CustomerNavItem;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
-  href: string;
-  health?: 'amber' | 'emerald' | 'red';
-  subItems?: SubNavItem[];
-}
+// ============================================
+// 类型定义
+// ============================================
 
 interface CustomerSidebarProps {
   tenantName?: string;
   tenantSlug?: string;
+  /** 动态徽章数据 */
+  badgeData?: {
+    'approvals.pending'?: number;
+    [key: string]: number | undefined;
+  };
+  /** 动态健康状态数据 */
+  healthData?: {
+    'radar.status'?: HealthIndicator;
+    'marketing.status'?: HealthIndicator;
+    'knowledge.status'?: HealthIndicator;
+    'social.status'?: HealthIndicator;
+    [key: string]: HealthIndicator | undefined;
+  };
 }
 
-export function CustomerSidebar({ tenantName = '客户企业', tenantSlug = 'tenant' }: CustomerSidebarProps) {
+const STORAGE_KEY = 'vertax-nav-expanded';
+
+// ============================================
+// 主组件
+// ============================================
+
+export function CustomerSidebar({ 
+  tenantName = '客户企业', 
+  tenantSlug = 'tenant',
+  badgeData = {},
+  healthData = {},
+}: CustomerSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedNav, setExpandedNav] = useState<string | null>('knowledge');
+  const [expandedNav, setExpandedNav] = useState<string | null>(null);
   const pathname = usePathname();
 
-  const navSections = [
-    {
-      label: '总览',
-      items: [
-        { id: CustomerNavItem.StrategicHome, label: '决策中心', icon: Home, href: '/c/home', health: undefined },
-      ] as NavItemConfig[],
-    },
-    {
-      label: '核心引擎',
-      items: [
-        {
-          id: CustomerNavItem.KnowledgeEngine,
-          label: '知识引擎',
-          icon: Library,
-          href: '/c/knowledge',
-          health: 'amber' as const,
-          subItems: [
-            { label: '素材资源', href: '/c/knowledge/assets', icon: FileStack },
-            { label: '证据库', href: '/c/knowledge/evidence', icon: ShieldCheck },
-            { label: '企业认知', href: '/c/knowledge/company', icon: Building2 },
-            { label: '品牌规范', href: '/c/knowledge/guidelines', icon: BookOpen },
-            { label: '人设中心', href: '/c/knowledge/profiles', icon: Users2 },
-          ],
-        },
-        { id: CustomerNavItem.OutreachRadar, label: '获客雷达', icon: Radar, href: '/c/radar', health: 'emerald' as const },
-        {
-          id: CustomerNavItem.MarketingDrive,
-          label: '营销系统',
-          icon: BarChart3,
-          href: '/c/marketing',
-          health: 'amber' as const,
-          subItems: [
-            { label: '内容规划', href: '/c/marketing/briefs', icon: FileEdit },
-            { label: '内容管理', href: '/c/marketing/contents', icon: Layers },
-          ],
-        },
-      ] as NavItemConfig[],
-    },
-    {
-      label: '运营渠道',
-      items: [
-        { id: CustomerNavItem.SocialPresence, label: '声量枢纽', icon: Globe, href: '/c/social', health: 'red' as const },
-        { id: CustomerNavItem.PromotionHub, label: '推进中台', icon: ClipboardList, href: '/c/hub', health: 'emerald' as const },
-      ] as NavItemConfig[],
-    },
-  ];
+  // 获取配置数据
+  const groups = getSortedGroups();
+  const itemsByGroup = getNavItemsByGroup();
+
+  // 初始化展开状态：读取 localStorage 或根据当前路由自动展开
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setExpandedNav(stored);
+    } else {
+      // 自动展开当前路由所属的一级
+      for (const groupKey of Object.keys(itemsByGroup) as NavGroupKey[]) {
+        const items = itemsByGroup[groupKey];
+        for (const item of items) {
+          if (pathname?.startsWith(item.href)) {
+            setExpandedNav(item.key);
+            break;
+          }
+        }
+      }
+    }
+  }, [pathname, itemsByGroup]);
+
+  // 保存展开状态到 localStorage
+  const toggleExpand = (key: string) => {
+    setExpandedNav((prev) => {
+      const next = prev === key ? null : key;
+      if (next) {
+        localStorage.setItem(STORAGE_KEY, next);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      return next;
+    });
+  };
 
   const isActive = (href: string) => pathname?.startsWith(href);
   const isExactActive = (href: string) => pathname === href || pathname?.endsWith(href);
 
-  const toggleExpand = (id: string) => {
-    setExpandedNav((prev) => (prev === id ? null : id));
+  // 获取徽章数量
+  const getBadgeCount = (source?: string): number | undefined => {
+    if (!source) return undefined;
+    return badgeData[source];
+  };
+
+  // 获取健康状态
+  const getHealthStatus = (source?: string): HealthIndicator | undefined => {
+    if (!source) return undefined;
+    return healthData[source];
   };
 
   return (
-    <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-[#0B1B2B] text-slate-400 flex flex-col h-screen sticky top-0 border-r border-[#10263B] transition-all duration-300`}>
-      {/* Brand Header */}
-      <div className={`${collapsed ? 'px-4 py-6' : 'px-5 py-6'} border-b border-[#10263B]/50`}>
+    <aside 
+      className={`${collapsed ? 'w-[72px]' : 'w-60'} flex flex-col h-screen sticky top-0 transition-all duration-300`}
+      style={{
+        background: 'linear-gradient(180deg, #0B1220 0%, #0A1018 100%)',
+      }}
+    >
+      {/* Brand Header - 高端会所风格 */}
+      <div className={`${collapsed ? 'px-4 py-6' : 'px-5 py-6'} border-b border-[rgba(255,255,255,0.06)]`}>
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
-          <div className="w-10 h-10 bg-gradient-to-br from-[#C7A56A] to-[#C7A56A]/80 rounded-xl flex items-center justify-center text-sm font-black text-[#0B1B2B] shadow-lg shadow-[#C7A56A]/20 shrink-0">
+          <div className="w-10 h-10 bg-gold rounded-xl flex items-center justify-center text-sm font-black text-[#0B1220] shadow-[0_0_20px_rgba(212,175,55,0.3)] shrink-0">
             {tenantSlug?.substring(0, 2).toUpperCase() || 'TD'}
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
               <h1 className="text-sm font-bold text-white tracking-tight truncate">{tenantName}</h1>
-              <p className="text-[9px] text-[#C7A56A]/70 font-bold uppercase tracking-widest">DIGITAL HQ</p>
+              <p className="text-[9px] text-gold font-bold uppercase tracking-widest opacity-80">GROWTH CHAMBER V0.2</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto scrollbar-hide">
-        {navSections.map((section, sIdx) => (
-          <div key={sIdx} className={sIdx > 0 ? 'mt-5' : ''}>
-            {!collapsed && (
-              <p className="px-5 mb-2 text-[9px] font-bold text-slate-600 uppercase tracking-[0.15em]">
-                {section.label}
-              </p>
-            )}
-            {collapsed && sIdx > 0 && (
-              <div className="mx-4 mb-3 border-t border-[#10263B]/50" />
-            )}
-            <div className={`${collapsed ? 'px-2' : 'px-3'} space-y-0.5`}>
-              {section.items.map((item) => {
-                const IconComponent = item.icon;
-                const active = isActive(item.href);
-                const health = item.health;
-                const hasSubItems = item.subItems && item.subItems.length > 0;
-                const isExpanded = expandedNav === item.id && !collapsed;
+      <nav className="flex-1 py-4 overflow-y-auto scrollbar-exec">
+        {groups.map((group, gIdx) => {
+          const items = itemsByGroup[group.key] || [];
+          if (items.length === 0) return null;
 
-                return (
-                  <div key={item.id}>
-                    {/* Main nav item */}
-                    <div className="flex items-center">
-                      <Link
-                        href={hasSubItems ? (item.subItems![0].href) : item.href}
-                        title={collapsed ? item.label : undefined}
-                        className={`flex-1 flex items-center ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5 text-sm rounded-lg transition-all relative group ${
-                          active
-                            ? 'bg-gradient-to-r from-[#10263B] to-[#10263B]/50 text-white'
-                            : 'hover:bg-[#10263B]/40 hover:text-slate-200 text-slate-500'
-                        }`}
-                      >
-                        {active && (
-                          <div className="absolute left-0 top-1/4 bottom-1/4 w-[2px] bg-[#C7A56A] rounded-r-full shadow-[0_0_6px_rgba(199,165,106,0.4)]" />
-                        )}
-                        <div className="relative shrink-0">
-                          <IconComponent
-                            size={18}
-                            strokeWidth={1.75}
-                            className={`transition-colors ${active ? 'text-[#C7A56A]' : 'text-slate-500 group-hover:text-slate-300'}`}
-                          />
-                          {health && !active && (
-                            <div className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${
-                              health === 'red' ? 'bg-red-400' : health === 'amber' ? 'bg-amber-400' : 'bg-emerald-400'
-                            }`} />
-                          )}
-                        </div>
-                        {!collapsed && (
-                          <span className={`ml-3 text-[13px] font-medium truncate ${active ? 'text-white' : ''}`}>
-                            {item.label}
-                          </span>
-                        )}
-                      </Link>
-                      {/* Expand toggle */}
-                      {hasSubItems && !collapsed && (
-                        <button
-                          onClick={() => toggleExpand(item.id)}
-                          className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors rounded"
-                        >
-                          <ChevronDown
-                            size={14}
-                            className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Sub items */}
-                    {hasSubItems && isExpanded && (
-                      <div className="ml-4 pl-4 border-l border-[#10263B]/50 mt-1 mb-2 space-y-0.5">
-                        {item.subItems!.map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive = isExactActive(sub.href);
-                          return (
-                            <Link
-                              key={sub.href}
-                              href={sub.href}
-                              className={`flex items-center gap-2.5 px-2.5 py-2 text-[12px] rounded-md transition-all ${
-                                subActive
-                                  ? 'text-[#C7A56A] bg-[#C7A56A]/5 font-medium'
-                                  : 'text-slate-500 hover:text-slate-300 hover:bg-[#10263B]/30'
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? 'text-[#C7A56A]' : ''} />
-                              {sub.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          return (
+            <div key={group.key} className={gIdx > 0 ? 'mt-5' : ''}>
+              {!collapsed && (
+                <p className="px-5 mb-2 text-[9px] font-medium text-[rgba(255,255,255,0.35)] uppercase tracking-[0.15em]">
+                  {group.label}
+                </p>
+              )}
+              {collapsed && gIdx > 0 && (
+                <div className="mx-4 mb-3 border-t border-[rgba(255,255,255,0.06)]" />
+              )}
+              <div className={`${collapsed ? 'px-2' : 'px-3'} space-y-0.5`}>
+                {items.map((item) => (
+                  <NavItemRow
+                    key={item.key}
+                    item={item}
+                    collapsed={collapsed}
+                    isActive={isActive(item.href)}
+                    isExpanded={expandedNav === item.key && !collapsed}
+                    isExactActive={isExactActive}
+                    healthStatus={getHealthStatus(item.healthSource)}
+                    badgeCount={getBadgeCount(item.badge?.source)}
+                    onToggleExpand={() => toggleExpand(item.key)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
-      {/* Footer */}
-      <div className={`${collapsed ? 'px-2' : 'px-4'} py-4 border-t border-[#10263B]/50`}>
+      {/* Footer - 徽章式账号卡 */}
+      <div className={`${collapsed ? 'px-2' : 'px-4'} py-4 border-t border-[rgba(255,255,255,0.06)]`}>
         {!collapsed && (
           <div className="px-2 mb-3">
-            <div className="flex items-center gap-2.5 p-2.5 bg-[#10263B]/30 rounded-lg border border-[#10263B]/50">
-              <div className="w-7 h-7 rounded-lg bg-[#C7A56A]/10 border border-[#C7A56A]/20 flex items-center justify-center text-[9px] font-bold text-[#C7A56A] shrink-0">
+            <div className="flex items-center gap-2.5 p-2.5 bg-[rgba(255,255,255,0.03)] rounded-lg border border-[rgba(255,255,255,0.06)]">
+              <div className="w-7 h-7 rounded-lg bg-[rgba(212,175,55,0.1)] border border-[rgba(212,175,55,0.25)] flex items-center justify-center text-[9px] font-bold text-gold shrink-0">
                 {tenantSlug?.substring(0, 2).toUpperCase() || 'TD'}
               </div>
               <div className="flex-1 overflow-hidden">
-                <p className="text-[11px] font-medium text-slate-300 truncate">{tenantSlug}.vertax.top</p>
+                <p className="text-[11px] font-medium text-[rgba(255,255,255,0.7)] truncate">{tenantSlug}.vertax.top</p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <div className="w-1 h-1 rounded-full bg-emerald-400" />
-                  <p className="text-[9px] text-slate-600">运行中</p>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+                  <p className="text-[9px] text-[rgba(255,255,255,0.4)]">执行引擎在线</p>
                 </div>
               </div>
             </div>
@@ -246,11 +180,152 @@ export function CustomerSidebar({ tenantName = '客户企业', tenantSlug = 'ten
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center py-2 text-slate-600 hover:text-slate-400 transition-colors rounded-lg hover:bg-[#10263B]/30"
+          className="w-full flex items-center justify-center py-2 text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.03)]"
         >
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       </div>
     </aside>
   );
+}
+
+// ============================================
+// 一级导航项
+// ============================================
+
+interface NavItemRowProps {
+  item: NavItem;
+  collapsed: boolean;
+  isActive: boolean;
+  isExpanded: boolean;
+  isExactActive: (href: string) => boolean;
+  healthStatus?: HealthIndicator;
+  badgeCount?: number;
+  onToggleExpand: () => void;
+}
+
+function NavItemRow({
+  item,
+  collapsed,
+  isActive,
+  isExpanded,
+  isExactActive,
+  healthStatus,
+  badgeCount,
+  onToggleExpand,
+}: NavItemRowProps) {
+  const IconComponent = item.icon;
+  const sortedSubItems = getSortedSubItems(item);
+  const hasSubItems = sortedSubItems.length > 0;
+
+  // 一级链接：有子菜单则跳转第一个子菜单，否则跳转自身
+  const linkHref = hasSubItems ? sortedSubItems[0].href : item.href;
+
+  return (
+    <div>
+      {/* Main nav item */}
+      <div className="flex items-center">
+        <Link
+          href={linkHref}
+          title={collapsed ? item.label : undefined}
+          className={`flex-1 flex items-center ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5 text-sm rounded-lg transition-all relative group ${
+            isActive
+              ? 'bg-[rgba(255,255,255,0.06)] text-white'
+              : 'hover:bg-[rgba(255,255,255,0.03)] hover:text-[rgba(255,255,255,0.85)] text-[rgba(255,255,255,0.5)]'
+          }`}
+        >
+          {/* 左侧金色选中条 + 金色细描边 */}
+          {isActive && (
+            <>
+              <div className="absolute left-0 top-1/4 bottom-1/4 w-[2px] bg-gold rounded-r-full shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
+              <div className="absolute inset-0 rounded-lg border border-[rgba(212,175,55,0.2)]" />
+            </>
+          )}
+          
+          {/* 图标 + 健康状态点 */}
+          <div className="relative shrink-0">
+            <IconComponent
+              size={18}
+              strokeWidth={1.75}
+              className={`transition-colors ${isActive ? 'text-gold' : 'text-[rgba(255,255,255,0.45)] group-hover:text-[rgba(255,255,255,0.7)]'}`}
+            />
+            {healthStatus && !isActive && (
+              <div className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${
+                healthStatus === 'red' ? 'bg-[#EF4444]' : 
+                healthStatus === 'amber' ? 'bg-[#F59E0B]' : 
+                'bg-[#22C55E]'
+              }`} />
+            )}
+          </div>
+          
+          {/* 标签 */}
+          {!collapsed && (
+            <span className={`ml-3 text-[13px] font-medium truncate flex-1 ${isActive ? 'text-white' : ''}`}>
+              {item.label}
+            </span>
+          )}
+          
+          {/* 数量徽章 */}
+          {!collapsed && badgeCount !== undefined && badgeCount > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-[#EF4444] text-white rounded">
+              {badgeCount > 99 ? '99+' : badgeCount}
+            </span>
+          )}
+        </Link>
+        
+        {/* 展开/折叠按钮 */}
+        {hasSubItems && !collapsed && (
+          <button
+            onClick={onToggleExpand}
+            className="p-1.5 text-[rgba(255,255,255,0.35)] hover:text-[rgba(255,255,255,0.6)] transition-colors rounded"
+          >
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Sub items */}
+      {hasSubItems && isExpanded && (
+        <div className="ml-4 pl-4 border-l border-[rgba(255,255,255,0.06)] mt-1 mb-2 space-y-0.5">
+          {sortedSubItems.map((sub) => {
+            const SubIcon = sub.icon;
+            const subActive = isExactActive(sub.href);
+            return (
+              <Link
+                key={sub.key}
+                href={sub.href}
+                className={`flex items-center gap-2.5 px-2.5 py-2 text-[12px] rounded-md transition-all ${
+                  subActive
+                    ? 'text-gold bg-[rgba(212,175,55,0.08)] font-medium'
+                    : 'text-[rgba(255,255,255,0.45)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[rgba(255,255,255,0.03)]'
+                }`}
+              >
+                <SubIcon size={14} className={subActive ? 'text-gold' : ''} />
+                {sub.label}
+                {/* 子菜单徽章（如"增值"） */}
+                {sub.badge?.type === 'premium' && sub.badge.text && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[9px] font-medium bg-[rgba(212,175,55,0.1)] text-gold border border-[rgba(212,175,55,0.25)] rounded">
+                    {sub.badge.text}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 导出枚举供外部使用（兼容旧代码）
+export enum CustomerNavItem {
+  StrategicHome = 'strategic-home',
+  KnowledgeEngine = 'knowledge',
+  OutreachRadar = 'radar',
+  MarketingDrive = 'marketing',
+  SocialPresence = 'social',
+  PromotionHub = 'hub',
 }

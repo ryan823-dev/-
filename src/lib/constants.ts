@@ -31,6 +31,35 @@ export const ROLES = {
   VIEWER: "VIEWER",
 } as const;
 
+// ==================== RBAC 应用角色 ====================
+export const APP_ROLES = {
+  DECIDER: 'DECIDER',
+  OPERATOR: 'OPERATOR',
+} as const;
+export type AppRole = (typeof APP_ROLES)[keyof typeof APP_ROLES];
+
+export const DISPLAY_MODES = {
+  SECRETARY: 'secretary',
+  ANALYST: 'analyst',
+} as const;
+export type DisplayMode = (typeof DISPLAY_MODES)[keyof typeof DISPLAY_MODES];
+
+// 决策者禁止操作列表（前端门控用）
+export const DECIDER_ONLY_ACTIONS = [
+  'content.approve',
+  'content.publish',
+  'content.delete',
+  'radar.configure',
+  'radar.delete',
+  'asset.delete',
+  'persona.delete',
+  'evidence.delete',
+  'guideline.delete',
+  'product.delete',
+  'social.publish',
+] as const;
+export type DeciderAction = (typeof DECIDER_ONLY_ACTIONS)[number];
+
 export const PRODUCT_STATUS = {
   DRAFT: "draft",
   PUBLISHED: "published",

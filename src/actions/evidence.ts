@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { chatCompletion } from "@/lib/ai-client";
+import { logActivity, ACTIVITY_ACTIONS, EVENT_CATEGORIES } from "@/lib/utils/activity-logger";
+import { requireDecider } from "@/lib/permissions";
 import type {
   EvidenceData,
   EvidenceFilters,
@@ -137,6 +139,18 @@ export async function createEvidence(input: CreateEvidenceInput): Promise<Eviden
     },
   });
 
+  // Fire-and-forget activity log
+  logActivity({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+    action: ACTIVITY_ACTIONS.EVIDENCE_CREATED,
+    entityType: "Evidence",
+    entityId: evidence.id,
+    eventCategory: EVENT_CATEGORIES.KNOWLEDGE,
+    severity: "info",
+    context: { title: evidence.title, type: evidence.type },
+  });
+
   revalidatePath("/zh-CN/knowledge");
 
   return {
@@ -173,6 +187,18 @@ export async function updateEvidence(id: string, input: UpdateEvidenceInput): Pr
     data,
   });
 
+  // Fire-and-forget activity log
+  logActivity({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+    action: ACTIVITY_ACTIONS.EVIDENCE_UPDATED,
+    entityType: "Evidence",
+    entityId: id,
+    eventCategory: EVENT_CATEGORIES.KNOWLEDGE,
+    severity: "info",
+    context: { updatedFields: Object.keys(data) },
+  });
+
   revalidatePath("/zh-CN/knowledge");
 }
 
@@ -180,10 +206,26 @@ export async function updateEvidence(id: string, input: UpdateEvidenceInput): Pr
 
 export async function deleteEvidence(id: string): Promise<void> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   await db.evidence.update({
     where: { id, tenantId: session.user.tenantId },
     data: { deletedAt: new Date() },
+  });
+
+  // Fire-and-forget activity log
+  logActivity({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+    action: ACTIVITY_ACTIONS.EVIDENCE_DELETED,
+    entityType: "Evidence",
+    entityId: id,
+    eventCategory: EVENT_CATEGORIES.KNOWLEDGE,
+    severity: "warn",
+    context: { softDelete: true },
   });
 
   revalidatePath("/zh-CN/knowledge");

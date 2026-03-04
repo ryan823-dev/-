@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { 
   Search, 
   Building2, 
@@ -157,6 +158,7 @@ export default function RadarCandidatesPage() {
       IMPORTED: { label: '已导入', color: 'bg-purple-50 text-purple-600' },
       EXCLUDED: { label: '已排除', color: 'bg-red-50 text-red-600' },
       EXPIRED: { label: '已过期', color: 'bg-slate-50 text-slate-600' },
+      ENRICHING: { label: '补全中', color: 'bg-cyan-50 text-cyan-600' },
     };
     return map[status] || { label: status, color: 'bg-slate-50 text-slate-600' };
   };
@@ -354,7 +356,14 @@ export default function RadarCandidatesPage() {
             <div className="text-center py-16">
               <Search size={48} className="text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">暂无候选数据</p>
-              <p className="text-xs text-slate-400 mt-2">前往「渠道地图」启动发现任务</p>
+              <p className="text-xs text-slate-400 mt-2">前往「发现任务」启动数据采集</p>
+              <Link 
+                href="/c/radar/tasks"
+                className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-[#0B1B2B] text-[#C7A56A] rounded-xl text-sm font-medium hover:bg-[#10263B] transition-colors"
+              >
+                前往发现任务
+                <ChevronRight size={14} />
+              </Link>
             </div>
           ) : (
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
@@ -587,9 +596,18 @@ export default function RadarCandidatesPage() {
                 )}
                 
                 {selectedCandidate.status === 'IMPORTED' && (
-                  <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-sm">
-                    <CheckCircle2 size={14} />
-                    已导入
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-sm">
+                      <CheckCircle2 size={14} />
+                      已导入
+                    </div>
+                    <Link
+                      href="/c/radar/prospects"
+                      className="w-full py-2 text-[#C7A56A] border border-[#C7A56A] rounded-lg text-sm font-medium hover:bg-[#C7A56A]/5 flex items-center justify-center gap-2"
+                    >
+                      前往线索库查看
+                      <ChevronRight size={14} />
+                    </Link>
                   </div>
                 )}
               </div>

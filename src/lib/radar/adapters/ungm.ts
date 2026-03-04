@@ -38,9 +38,15 @@ export class UNGMAdapter implements RadarAdapter {
   async search(query: RadarSearchQuery): Promise<RadarSearchResult> {
     const startTime = Date.now();
     
+    // 游标支持：优先使用 cursor 中的分页和时间
+    const page = query.cursor?.nextPage ?? query.page ?? 0;
+    const publishedAfter = query.cursor?.since 
+      ? new Date(query.cursor.since) 
+      : query.publishedAfter;
+    
     // 构建请求参数
     const params = new URLSearchParams();
-    params.set('PageIndex', String(query.page || 0));
+    params.set('PageIndex', String(page));
     params.set('PageSize', String(Math.min(query.pageSize || 20, 100)));
     
     if (query.keywords?.length) {
@@ -51,6 +57,9 @@ export class UNGMAdapter implements RadarAdapter {
     }
     if (query.deadlineBefore) {
       params.set('DeadlineTo', query.deadlineBefore.toISOString().split('T')[0]);
+    }
+    if (publishedAfter) {
+      params.set('PublishedFrom', publishedAfter.toISOString().split('T')[0]);
     }
     if (query.categories?.length) {
       // UNGM 使用 UNSPSC 分类
@@ -89,13 +98,18 @@ export class UNGMAdapter implements RadarAdapter {
         items: results.map((item: unknown) => this.normalize(item)),
         total,
         hasMore,
-        nextPage: hasMore ? (query.page || 0) + 1 : undefined,
+        nextPage: hasMore ? page + 1 : undefined,
         metadata: {
           source: this.sourceCode,
           query,
           fetchedAt: new Date(),
           duration,
         },
+        // 持续扫描游标
+        nextCursor: hasMore 
+          ? { nextPage: page + 1, since: query.cursor?.since }
+          : undefined,
+        isExhausted: !hasMore,
       };
     } catch (error) {
       clearTimeout(timeoutId);

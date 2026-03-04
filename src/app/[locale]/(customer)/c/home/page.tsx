@@ -4,23 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Sparkles, 
+  Clock, 
   TrendingUp,
-  Target,
   FileText,
-  Clock,
-  ChevronRight,
-  Send,
-  Lightbulb,
-  Library,
-  Radar,
-  Globe,
-  Loader2,
-  RefreshCw,
-  AlertCircle,
   CheckCircle2,
+  AlertTriangle,
+  Send, 
+  RefreshCw,
+  Loader2,
+  ChevronRight,
   Zap,
-  ArrowUpRight,
+  Target,
 } from 'lucide-react';
+import { useRoleContext } from '@/contexts/role-context';
+import { DISPLAY_MODES } from '@/lib/constants';
 import {
   getDashboardStats,
   getPendingActions,
@@ -31,51 +28,61 @@ import {
   type TenantInfo,
   type AIBriefing,
 } from '@/actions/dashboard';
+import {
+  createConversation,
+  sendMessage,
+  type MessageData,
+} from '@/actions/chat';
 
-// Quick action buttons for AI chat
-const quickPrompts = [
-  { label: '一分钟汇报', icon: Clock },
+// ============================================
+// 快捷指令（动词开头，更紧凑）
+// ============================================
+const quickCommands = [
+  { label: '一分钟汇报', icon: Clock, recommended: true },
   { label: '本周战果', icon: TrendingUp },
-  { label: '哪些线索值得跟进', icon: Target },
-  { label: '增长瓶颈在哪', icon: Lightbulb },
+  { label: '商机概览', icon: Target },
+  { label: '待您审批', icon: CheckCircle2 },
+  { label: '增长瓶颈', icon: AlertTriangle },
 ];
 
-export default function StrategicHomePage() {
+// ============================================
+// 主页面
+// ============================================
+export default function CEOCockpitPage() {
   const [isLoading, setIsLoading] = useState(true);
-  const [inputValue, setInputValue] = useState('');
-  const [currentTime, setCurrentTime] = useState('');
-  const [currentDate, setCurrentDate] = useState('');
-  
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
   const [briefing, setBriefing] = useState<AIBriefing | null>(null);
-  const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  
+  // Chat
+  const [inputValue, setInputValue] = useState('');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MessageData[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  
+  // 从 RoleContext 读取角色与显示模式
+  const { displayMode, isDecider } = useRoleContext();
+  const isSecretaryMode = displayMode === DISPLAY_MODES.SECRETARY;
 
-  // Time update
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
-      setCurrentDate(now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }));
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Load data
+  // ============================================
+  // 数据加载
+  // ============================================
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [statsData, actionsData, tenantData] = await Promise.all([
+      const [statsData, actionsData, tenantData, briefingData] = await Promise.all([
         getDashboardStats(),
         getPendingActions(),
         getTenantInfo(),
+        generateAIBriefing().catch(() => null),
       ]);
       setStats(statsData);
       setActions(actionsData);
       setTenantInfo(tenantData);
+      if (briefingData) setBriefing(briefingData);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -87,312 +94,380 @@ export default function StrategicHomePage() {
     loadData();
   }, [loadData]);
 
-  // Generate AI briefing
-  const handleGenerateBriefing = async () => {
-    setIsGeneratingBriefing(true);
-    try {
-      const result = await generateAIBriefing();
-      setBriefing(result);
-    } catch (err) {
-      console.error('Failed to generate briefing:', err);
-    } finally {
-      setIsGeneratingBriefing(false);
-    }
-  };
-
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    // TODO: Implement AI chat
-    console.log('Send:', inputValue);
+  // ============================================
+  // Chat
+  // ============================================
+  const handleSend = useCallback(async () => {
+    if (!inputValue.trim() || isSending) return;
+    setIsSending(true);
+    const content = inputValue;
     setInputValue('');
+
+    try {
+      let convId = conversationId;
+      if (!convId) {
+        const conv = await createConversation(content.slice(0, 20) + '...');
+        convId = conv.id;
+        setConversationId(convId);
+      }
+      const response = await sendMessage(convId, content);
+      setMessages(prev => [...prev, 
+        { id: `user-${Date.now()}`, conversationId: convId!, role: 'user', content, createdAt: new Date() },
+        response
+      ]);
+    } catch (err) {
+      console.error('Failed to send:', err);
+    } finally {
+      setIsSending(false);
+    }
+  }, [inputValue, isSending, conversationId]);
+
+  const handleQuickCommand = (label: string) => {
+    setInputValue(label);
   };
 
-  // Get priority style
-  const getPriorityStyle = (priority: string) => {
-    const styles: Record<string, string> = {
-      P0: 'bg-red-100 text-red-600',
-      P1: 'bg-amber-100 text-amber-600',
-      P2: 'bg-blue-100 text-blue-600',
-    };
-    return styles[priority] || 'bg-slate-100 text-slate-600';
-  };
-
-  // Module stats for display
-  const moduleStats = stats ? [
-    { 
-      key: 'knowledge', 
-      label: '知识体系', 
-      value: stats.knowledgeCompleteness.toString(), 
-      unit: '%', 
-      change: stats.knowledgeCompleteness >= 80 ? '完善' : stats.knowledgeCompleteness >= 50 ? '良好' : '待完善', 
-      href: '/c/knowledge',
-      color: stats.knowledgeCompleteness >= 80 ? 'text-emerald-500' : stats.knowledgeCompleteness >= 50 ? 'text-amber-500' : 'text-red-500',
-    },
-    { 
-      key: 'leads', 
-      label: '潜在客户', 
-      value: stats.totalLeads.toString(), 
-      unit: '家', 
-      change: stats.highIntentLeads > 0 ? `${stats.highIntentLeads} 高意向` : '已发现', 
-      href: '/c/radar',
-      color: stats.highIntentLeads > 0 ? 'text-emerald-500' : 'text-slate-400',
-    },
-    { 
-      key: 'content', 
-      label: '内容资产', 
-      value: stats.totalContents.toString(), 
-      unit: '篇', 
-      change: stats.pendingContents > 0 ? `${stats.pendingContents} 待发布` : '已就绪', 
-      href: '/c/marketing',
-      color: stats.pendingContents > 0 ? 'text-amber-500' : 'text-emerald-500',
-    },
-    { 
-      key: 'actions', 
-      label: '待决策项', 
-      value: stats.pendingTasks.toString(), 
-      unit: '项', 
-      change: stats.blockedTasks > 0 ? `${stats.blockedTasks} P0阻塞` : '正常', 
-      href: '/c/hub',
-      color: stats.blockedTasks > 0 ? 'text-red-500' : 'text-emerald-500',
-    },
-  ] : [];
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-[#C7A56A] animate-spin" />
-      </div>
-    );
-  }
-
+  // ============================================
+  // 渲染
+  // ============================================
   return (
-    <div className="space-y-8">
-      {/* Decision Briefing Header */}
-      <div className="bg-[#FFFCF6] rounded-[2rem] border border-[#E7E0D3] p-8 shadow-sm">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-[#0B1B2B] flex items-center gap-3">
-              <Sparkles className="text-[#C7A56A]" size={24} />
-              今日决策简报
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">{currentDate}</p>
-          </div>
-          <div className="text-right flex items-center gap-4">
-            <button
-              onClick={loadData}
-              className="p-2 text-slate-400 hover:text-[#C7A56A] transition-colors"
-            >
-              <RefreshCw size={18} />
-            </button>
-            <div>
-              <p className="text-3xl font-bold text-[#0B1B2B]">{currentTime}</p>
-              <p className="text-xs text-slate-400">更新</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#F7F3EA] rounded-2xl p-6 mb-6">
-          <p className="text-sm text-slate-600">
-            <span className="font-bold text-[#0B1B2B]">{tenantInfo?.companyName || tenantInfo?.name || '企业'}</span> 全球化获客态势
-          </p>
-          <p className="text-xs text-slate-500 mt-2">
-            VertaX 智能引擎已完成深度分析，以下是需要您关注的关键指标与决策事项。
-          </p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-4">
-          {moduleStats.map((stat) => (
-            <Link
-              key={stat.key}
-              href={stat.href}
-              className="bg-white rounded-xl p-4 border border-[#E7E0D3] hover:border-[#C7A56A]/50 hover:shadow-md transition-all group"
-            >
-              <p className="text-xs text-slate-500 mb-1">{stat.label}</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold text-[#0B1B2B]">{stat.value}</span>
-                <span className="text-sm text-slate-400">{stat.unit}</span>
-              </div>
-              <p className={`text-[10px] mt-1 ${stat.color}`}>{stat.change}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* AI Briefing Section */}
-      <div className="bg-gradient-to-br from-[#0B1B2B] to-[#10263B] rounded-[2rem] p-8 text-white">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-[#C7A56A]">AI 战略简报</h3>
-          <button
-            onClick={handleGenerateBriefing}
-            disabled={isGeneratingBriefing}
-            className="px-3 py-1.5 bg-[#C7A56A]/10 border border-[#C7A56A]/30 rounded-lg text-[#C7A56A] text-xs font-medium hover:bg-[#C7A56A]/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {isGeneratingBriefing ? (
-              <>
-                <Loader2 size={12} className="animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Sparkles size={12} />
-                生成简报
-              </>
-            )}
-          </button>
-        </div>
-
-        {briefing ? (
-          <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-white">
-              {briefing.summary}
-            </p>
-            
-            {briefing.highlights.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-[#C7A56A]">✨ 亮点</p>
-                {briefing.highlights.map((highlight, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                    <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                    <span>{highlight}</span>
+    <div className="min-h-full bg-cream">
+      <div className="max-w-[1720px] mx-auto">
+        {/* 主内容区：9:3 栅格 */}
+        <div className="grid grid-cols-12 gap-5">
+          {/* 左侧：驾驶舱主容器（8栏） */}
+          <main className="col-span-12 lg:col-span-8 xl:col-span-9">
+            {/* CEO驾驶舱大容器 - 增加高度 */}
+            <div className="cockpit-container-v2 p-6 lg:p-7">
+              {/* 容器头部 */}
+              <div className="flex items-start justify-between mb-5 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-navy-elevated rounded-xl flex items-center justify-center border border-[var(--border-navy)]">
+                    <ChevronRight size={16} className="text-gold" />
                   </div>
-                ))}
-              </div>
-            )}
-
-            {briefing.recommendations.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-[#C7A56A]">💡 建议</p>
-                {briefing.recommendations.map((rec, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-slate-300">
-                    <Zap size={12} className="text-amber-400 mt-0.5 shrink-0" />
-                    <span>{rec}</span>
+                  <div>
+                    <h1 className="text-light text-xl font-bold tracking-tight">
+                      出海战略助理 | <span className="text-gold">CEO VIEW</span>
+                    </h1>
+                    <p className="text-light-muted text-xs flex items-center gap-2 mt-1">
+                      <span className="status-dot status-dot-success" />
+                      AI ENGINE · 实时数据流
+                    </p>
                   </div>
-                ))}
+                </div>
+                <button 
+                  onClick={loadData}
+                  className="flex items-center gap-2 px-3 py-1.5 text-light-muted hover:text-light border border-[var(--border-navy)] rounded-lg transition-colors text-xs"
+                >
+                  <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+                  <span>{lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                </button>
               </div>
-            )}
 
-            <p className="text-[10px] text-slate-500 pt-2">
-              生成于 {new Date(briefing.generatedAt).toLocaleString('zh-CN')}
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm leading-relaxed text-slate-300">
-            点击"生成简报"获取 AI 战略分析
-          </p>
-        )}
+              {/* 主内容区：左侧快报 + 右侧指令 */}
+              <div className="flex gap-5 relative z-10">
+                {/* CEO专属增长快报（奶油白卡片）- 更大更突出 */}
+                <div className="flex-1 report-card-v2 p-5 lg:p-6">
+                  <div className="flex items-center gap-2 mb-5">
+                    <Sparkles size={18} className="text-gold" />
+                    <h2 className="text-dark font-bold text-base">CEO专属增长快报</h2>
+                    <span className="ml-auto text-dark-muted text-xs font-tabular">
+                      {lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 更新
+                    </span>
+                  </div>
 
-        {/* Module Quick Links */}
-        <div className="flex gap-3 mt-6 pt-6 border-t border-white/10">
-          {[
-            { label: '知识', icon: Library, href: '/c/knowledge' },
-            { label: '获客', icon: Radar, href: '/c/radar' },
-            { label: '内容', icon: FileText, href: '/c/marketing' },
-            { label: '社媒', icon: Globe, href: '/c/social' },
-          ].map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs text-slate-400 hover:text-white"
-            >
-              <item.icon size={14} />
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="w-8 h-8 text-gold animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {/* 核心结论 - 三段式结构 */}
+                      <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
+                        <span className="text-dark-secondary text-sm font-medium pt-0.5">核心结论</span>
+                        <p className="text-dark text-[15px] leading-relaxed">
+                          {briefing?.summary || (
+                            <>推进正常：资料结构化与内容校正进入关键阶段；站点与社媒数据接入中。</>
+                          )}
+                        </p>
+                      </div>
+                      
+                      {/* 关键成果 */}
+                      <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-dark-secondary text-sm font-medium">关键成果</span>
+                          <span className="badge-gold text-[9px] py-0.5 px-1.5">V0.2</span>
+                        </div>
+                        <div className="space-y-2">
+                          {briefing?.highlights?.slice(0, 3).map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-[15px] text-dark">
+                              <CheckCircle2 size={15} className="text-success mt-0.5 shrink-0" />
+                              <span>{item}</span>
+                            </div>
+                          )) || (
+                            <>
+                              <div className="flex items-start gap-2 text-[15px] text-dark">
+                                <CheckCircle2 size={15} className="text-success mt-0.5 shrink-0" />
+                                <span>已生成内容草稿 <span className="text-gold font-semibold">1 篇</span>（待你确认 1 篇）</span>
+                              </div>
+                              <div className="flex items-start gap-2 text-[15px] text-dark">
+                                <CheckCircle2 size={15} className="text-success mt-0.5 shrink-0" />
+                                <span>已完成知识结构化：OfferingCard 1 项、ProofCard 1 项...</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        {/* Pending Actions */}
-        <div className="bg-[#FFFCF6] rounded-[2rem] border border-[#E7E0D3] p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-[#0B1B2B]">待您拍板推进</h3>
-            <Link href="/c/hub" className="text-xs text-[#C7A56A] hover:underline flex items-center gap-1">
-              查看全部
-              <ArrowUpRight size={12} />
-            </Link>
-          </div>
-          
-          {actions.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={40} className="text-emerald-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500">太棒了！没有待决策事项</p>
+                      {/* 当前阻塞点 - 更明显的警示块 */}
+                      <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
+                        <span className="text-dark-secondary text-sm font-medium pt-1">阻塞卡点</span>
+                        <div className="space-y-2">
+                          {actions.length > 0 ? actions.slice(0, 2).map((action, idx) => (
+                            <div key={idx} className="alert-block-warning p-3">
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-dark text-sm font-medium">{action.title}</p>
+                                  <p className="text-dark-muted text-xs mt-0.5">影响：{action.module}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )) : (
+                            <>
+                              <div className="alert-block-warning p-3">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-dark text-sm font-medium">渠道授权未完成</p>
+                                    <p className="text-dark-muted text-xs mt-0.5">影响：LinkedIn 自动发布排程已挂起</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="alert-block-danger p-3">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle size={14} className="text-danger mt-0.5 shrink-0" />
+                                  <div>
+                                    <p className="text-dark text-sm font-medium">关键参数缺失</p>
+                                    <p className="text-dark-muted text-xs mt-0.5">影响 2 项选型指南生成精度</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 右侧快捷指令区 - 更紧凑 */}
+                <div className="w-36 space-y-1.5 shrink-0">
+                  <p className="text-light-muted text-xs mb-2 px-1">快捷预案</p>
+                  {quickCommands.map((cmd) => (
+                    <button
+                      key={cmd.label}
+                      onClick={() => handleQuickCommand(cmd.label)}
+                      className="btn-cockpit-v2 flex items-center gap-2"
+                    >
+                      {cmd.recommended && <span className="w-1.5 h-1.5 rounded-full bg-gold shrink-0" />}
+                      <cmd.icon size={13} />
+                      <span className="truncate">{cmd.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 底部大输入框 - 更高更气派 */}
+              <div className="mt-5 relative z-10">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                    placeholder="董事长您请吩咐：想查看本周商机、内容进度，或需要我给出下一步建议？"
+                    className="input-cockpit-v2 flex-1"
+                    disabled={isSending}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || isSending}
+                    className="btn-gold-v2 px-6 flex items-center justify-center"
+                  >
+                    {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                  </button>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {actions.map((action) => (
-                <div key={action.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#E7E0D3]">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${getPriorityStyle(action.priority)}`}>
-                    {action.priority}
+
+            {/* 底部：待决策区 - 间距缩小 */}
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap size={15} className="text-gold" />
+                  <h2 className="text-dark font-bold text-sm">AI 缺口识别与待您决策</h2>
+                </div>
+                <span className="text-dark-muted text-xs">P0 优先级：{actions.filter(a => a.priority === 'P0').length}</span>
+              </div>
+
+              {actions.slice(0, 2).map((action) => (
+                <div key={action.id} className="secretary-card-v2 p-4 flex items-center gap-4">
+                  <span className={`px-2 py-1 text-xs font-bold rounded ${
+                    action.priority === 'P0' ? 'bg-[rgba(239,68,68,0.1)] text-danger' : 'bg-[rgba(245,158,11,0.1)] text-warning'
+                  }`}>
+                    {action.priority === 'P0' ? '发布审批' : '权限连接'}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm text-[#0B1B2B] block truncate">{action.title}</span>
-                    <span className="text-[10px] text-slate-400">{action.module}</span>
+                    <p className="text-dark font-medium text-sm">{action.title}</p>
+                    <p className="text-dark-muted text-xs mt-0.5 truncate">内容已根据"旧线改造案例"生成，需校实涂料节省数据准确性</p>
                   </div>
-                  <Link 
+                  <Link
                     href={action.actionLink}
-                    className="px-3 py-1.5 bg-[#C7A56A] text-[#0B1B2B] text-xs font-bold rounded-lg hover:bg-[#C7A56A]/90 transition-colors flex items-center gap-1"
+                    className="btn-gold-sm px-4 py-2 text-sm shrink-0"
                   >
-                    {action.action}
-                    <ChevronRight size={12} />
+                    {action.action || '立即审批'}
                   </Link>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </main>
 
-        {/* AI Strategic Advisor */}
-        <div className="bg-[#FFFCF6] rounded-[2rem] border border-[#E7E0D3] p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#C7A56A] to-[#C7A56A]/80 rounded-xl flex items-center justify-center">
-              <Sparkles size={18} className="text-[#0B1B2B]" />
+          {/* 右侧：秘书台（4栏）- 重构为汇报清单 */}
+          <aside className="col-span-12 lg:col-span-4 xl:col-span-3 space-y-3">
+            {/* A) 秘书汇报主卡（置顶） */}
+            <div className="secretary-card-v2 p-4">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[var(--border-cream)]">
+                <FileText size={14} className="text-dark-secondary" />
+                <span className="text-dark font-bold text-sm">秘书汇报</span>
+                <span className="ml-auto text-dark-muted text-[10px]">实时</span>
+              </div>
+              
+              {/* KPI清单 - 更像汇报条目 */}
+              <div className="space-y-0">
+                <SecretaryRow 
+                  label="知识完整度" 
+                  value={`${stats?.knowledgeCompleteness || 78}%`}
+                  status="progress"
+                  href="/c/knowledge/assets"
+                />
+                <SecretaryRow 
+                  label="内容库存" 
+                  value="1.2GB"
+                  status="progress"
+                  href="/c/knowledge/assets"
+                />
+                <SecretaryRow 
+                  label="待您确认" 
+                  value={`${actions.length} 项`}
+                  status={actions.length > 0 ? 'attention' : 'progress'}
+                  href="/c/hub"
+                />
+                <SecretaryRow 
+                  label="VOC 合规" 
+                  value="A+"
+                  subtext="行业领先"
+                  status="progress"
+                  href="/c/radar"
+                  isLast
+                />
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-[#0B1B2B]">VertaX 出海战略顾问</h2>
-              <p className="text-xs text-emerald-500">在线 · 深度了解您的业务</p>
-            </div>
-          </div>
 
-          {/* Quick Prompts */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt.label}
-                onClick={() => setInputValue(prompt.label)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E7E0D3] rounded-lg text-xs text-slate-600 hover:border-[#C7A56A]/50 hover:text-[#0B1B2B] transition-colors"
-              >
-                <prompt.icon size={12} />
-                {prompt.label}
+            {/* B) AI执行官消息（缩小，更像秘书建议） */}
+            <div className="highlight-card-v2 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={13} className="text-gold" />
+                <span className="text-gold text-xs font-semibold">AI 执行官建议</span>
+              </div>
+              <p className="text-dark-secondary text-sm leading-relaxed">
+                {briefing?.recommendations?.[0]?.slice(0, 60) || '识别到喷涂工作站参数缺口。补齐将提升选型手册质量。'}
+                {(briefing?.recommendations?.[0]?.length || 0) > 60 && '...'}
+              </p>
+              <button className="mt-3 flex items-center gap-1.5 text-gold text-xs font-medium hover:underline">
+                <FileText size={12} />
+                立即补齐资料
               </button>
-            ))}
-          </div>
+            </div>
 
-          <p className="text-[10px] text-slate-400 mb-3">
-            点击快捷指令或直接提问<br />
-            已同步您的产品、客户、进展数据
-          </p>
-
-          {/* Chat Input */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="请指示..."
-              className="flex-1 px-4 py-2.5 bg-white border border-[#E7E0D3] rounded-xl text-sm focus:outline-none focus:border-[#C7A56A] transition-colors"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!inputValue.trim()}
-              className="px-4 py-2.5 bg-[#0B1B2B] text-[#C7A56A] rounded-xl hover:bg-[#10263B] transition-colors disabled:opacity-50"
-            >
-              <Send size={16} />
-            </button>
-          </div>
+            {/* C) 待您审批列表（若有） */}
+            {isSecretaryMode && (
+              <div className="secretary-card-v2 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 size={14} className="text-dark-secondary" />
+                  <span className="text-dark font-bold text-sm">待您审批</span>
+                  {actions.length > 0 && (
+                    <span className="ml-auto badge-attention text-[10px]">{actions.length}</span>
+                  )}
+                </div>
+                
+                {actions.length > 0 ? (
+                  <div className="space-y-2">
+                    {actions.slice(0, 3).map((action, idx) => (
+                      <Link 
+                        key={action.id} 
+                        href={action.actionLink}
+                        className="flex items-center gap-2 p-2 rounded-lg hover:bg-cream-warm transition-colors group"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          action.priority === 'P0' ? 'bg-danger' : 'bg-warning'
+                        }`} />
+                        <span className="text-dark text-sm truncate flex-1">{action.title}</span>
+                        <ChevronRight size={12} className="text-dark-muted group-hover:text-gold transition-colors" />
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-dark-muted text-sm py-2">已为您处理完毕，暂无需确认事项。</p>
+                )}
+              </div>
+            )}
+          </aside>
         </div>
       </div>
     </div>
+  );
+}
+
+// ============================================
+// 子组件：秘书汇报行
+// ============================================
+function SecretaryRow({ 
+  label, 
+  value, 
+  subtext,
+  status, 
+  href,
+  isLast = false,
+}: { 
+  label: string; 
+  value: string; 
+  subtext?: string;
+  status: 'progress' | 'attention';
+  href: string;
+  isLast?: boolean;
+}) {
+  return (
+    <Link 
+      href={href}
+      className={`flex items-center justify-between py-2.5 group hover:bg-cream-warm -mx-2 px-2 rounded-lg transition-colors ${
+        !isLast ? 'border-b border-[var(--border-cream)]' : ''
+      }`}
+    >
+      <span className="text-dark-secondary text-sm">{label}</span>
+      <div className="flex items-center gap-2">
+        <div className="text-right">
+          <span className="text-dark font-bold font-tabular text-sm">{value}</span>
+          {subtext && <span className="text-dark-muted text-[10px] ml-1">{subtext}</span>}
+        </div>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+          status === 'attention' 
+            ? 'bg-[rgba(245,158,11,0.12)] text-warning' 
+            : 'bg-[rgba(34,197,94,0.12)] text-success'
+        }`}>
+          {status === 'attention' ? '需关注' : '稳步'}
+        </span>
+        <ChevronRight size={12} className="text-dark-muted group-hover:text-gold transition-colors" />
+      </div>
+    </Link>
   );
 }

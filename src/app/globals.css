@@ -116,41 +116,142 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Customer View Theme (Ivory/Navy/Gold) */
+/* ==================================================
+   VertaX Executive Theme - CEO驾驶舱尊贵感设计系统
+   Target: 45+ Chinese CEOs / EMBA / 高管
+   Style: 奶油白底 + 深蓝舞台容器 + 金色点缀
+   参考：CEO VIEW 驾驶舱设计
+   ================================================== */
+
 .customer-theme {
-  --background: #F7F3EA;
-  --foreground: #111827;
-  --card: #FFFCF6;
-  --card-foreground: #111827;
-  --popover: #FFFCF6;
-  --popover-foreground: #111827;
-  --primary: #C7A56A;
-  --primary-foreground: #0B1B2B;
-  --secondary: #10263B;
-  --secondary-foreground: #F7F3EA;
-  --muted: #E7E0D3;
-  --muted-foreground: #64748b;
-  --accent: #C7A56A;
-  --accent-foreground: #0B1B2B;
-  --border: #E7E0D3;
-  --input: #E7E0D3;
-  --ring: #C7A56A;
-  --sidebar: #0B1B2B;
-  --sidebar-foreground: #94a3b8;
-  --sidebar-primary: #C7A56A;
-  --sidebar-primary-foreground: #0B1B2B;
-  --sidebar-accent: #10263B;
-  --sidebar-accent-foreground: #F7F3EA;
-  --sidebar-border: #10263B;
-  --sidebar-ring: #C7A56A;
+  /* ─────────────────────────────────────────────────
+     1. 页面背景色（奶油白/象牙灰）
+     ───────────────────────────────────────────────── */
+  --bg-cream: #F5F1E8;              /* 奶油白 - 页面主背景 */
+  --bg-cream-warm: #F8F4EB;         /* 更暖的奶油色 */
+  --bg-cream-surface: #FFFCF7;      /* 象牙白 - 卡片表面 */
   
-  /* Custom customer colors */
-  --ivory: #F7F3EA;
-  --ivory-surface: #FFFCF6;
-  --navy-800: #10263B;
-  --navy-900: #0B1B2B;
-  --gold: #C7A56A;
-  --customer-border: #E7E0D3;
+  /* ─────────────────────────────────────────────────
+     2. 深蓝舞台容器（驾驶舱核心）
+     ───────────────────────────────────────────────── */
+  --bg-navy: #0B1220;               /* 深蓝底 - 驾驶舱容器 */
+  --bg-navy-light: #0F1728;         /* 稍浅深蓝 */
+  --bg-navy-elevated: #141D2B;      /* 浮层深蓝 */
+  --bg-navy-surface: #1A2535;       /* 输入框/悬浮态 */
+  
+  /* 舞台渐变 */
+  --gradient-navy: linear-gradient(135deg, #0B1220 0%, #0A1018 100%);
+  --gradient-navy-glow: radial-gradient(ellipse at 50% 0%, rgba(212,175,55,0.08) 0%, transparent 60%);
+  
+  /* ─────────────────────────────────────────────────
+     3. 金色系统（点缀用，禁止大面积）
+     ───────────────────────────────────────────────── */
+  --gold-primary: #D4AF37;          /* 土豪金 - 主强调 */
+  --gold-soft: #D4AF37CC;           /* 金色 80% */
+  --gold-muted: #D4AF3766;          /* 金色 40% */
+  --gold-subtle: #D4AF371A;         /* 金色 10% */
+  --gold-glow: 0 0 20px #D4AF3733;  /* 金色外发光 */
+  
+  /* ─────────────────────────────────────────────────
+     4. 文字层级
+     ───────────────────────────────────────────────── */
+  --text-dark: #1A1A1A;             /* 深色文字 - 浅底用 */
+  --text-dark-secondary: #4A5568;   /* 次要文字 - 浅底用 */
+  --text-dark-muted: #718096;       /* 辅助文字 - 浅底用 */
+  --text-light: #FFFFFF;            /* 白色文字 - 深底用 */
+  --text-light-secondary: #94A3B8;  /* 银灰文字 - 深底用 */
+  --text-light-muted: #64748B;      /* 暗灰文字 - 深底用 */
+  --text-gold: #D4AF37;             /* 金色强调 */
+  
+  /* ─────────────────────────────────────────────────
+     5. 语义颜色
+     ───────────────────────────────────────────────── */
+  --success: #22C55E;
+  --success-soft: #22C55E1A;
+  --warning: #F59E0B;
+  --warning-soft: #F59E0B1A;
+  --danger: #EF4444;
+  --danger-soft: #EF44441A;
+  --info: #3B82F6;
+  --info-soft: #3B82F61A;
+  
+  /* ─────────────────────────────────────────────────
+     6. 边框系统
+     ───────────────────────────────────────────────── */
+  --border-cream: #E8E0D0;          /* 奶油底边框 */
+  --border-navy: rgba(255,255,255,0.08);  /* 深蓝底边框 */
+  --border-navy-strong: rgba(255,255,255,0.12);
+  --border-gold: rgba(212,175,55,0.35);
+  --border-gold-strong: rgba(212,175,55,0.5);
+  
+  /* ─────────────────────────────────────────────────
+     7. 阴影系统
+     ───────────────────────────────────────────────── */
+  --shadow-cream-card: 0 2px 12px -2px rgba(0,0,0,0.06);
+  --shadow-navy-container: 0 8px 40px -8px rgba(0,0,0,0.4);
+  --shadow-navy-card: 0 4px 20px -4px rgba(0,0,0,0.3);
+  --shadow-gold-glow: 0 0 40px rgba(212,175,55,0.15);
+  --shadow-gold-btn: 0 4px 16px -2px rgba(212,175,55,0.3);
+  
+  /* ─────────────────────────────────────────────────
+     8. 圆角系统
+     ───────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-container: 32px;         /* 大容器圆角 */
+  
+  /* ─────────────────────────────────────────────────
+     9. 动画系统
+     ───────────────────────────────────────────────── */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ─────────────────────────────────────────────────
+     Shadcn/Tailwind Token Mapping（奶油底版）
+     ───────────────────────────────────────────────── */
+  --background: var(--bg-cream);
+  --foreground: var(--text-dark);
+  --card: var(--bg-cream-surface);
+  --card-foreground: var(--text-dark);
+  --popover: var(--bg-cream-surface);
+  --popover-foreground: var(--text-dark);
+  --primary: var(--gold-primary);
+  --primary-foreground: var(--bg-navy);
+  --secondary: var(--bg-cream-warm);
+  --secondary-foreground: var(--text-dark-secondary);
+  --muted: var(--bg-cream-warm);
+  --muted-foreground: var(--text-dark-muted);
+  --accent: var(--gold-subtle);
+  --accent-foreground: var(--gold-primary);
+  --destructive: var(--danger);
+  --border: var(--border-cream);
+  --input: var(--border-cream);
+  --ring: var(--gold-primary);
+  
+  /* Sidebar（深蓝） */
+  --sidebar: var(--bg-navy);
+  --sidebar-foreground: var(--text-light-secondary);
+  --sidebar-primary: var(--gold-primary);
+  --sidebar-primary-foreground: var(--bg-navy);
+  --sidebar-accent: var(--bg-navy-elevated);
+  --sidebar-accent-foreground: var(--text-light);
+  --sidebar-border: var(--border-navy);
+  --sidebar-ring: var(--gold-primary);
+  
+  /* Legacy compatibility */
+  --bg-base: var(--bg-navy);
+  --bg-panel: var(--bg-navy-light);
+  --bg-elevated: var(--bg-navy-elevated);
+  --bg-surface: var(--bg-navy-surface);
+  --text-primary: var(--text-light);
+  --text-secondary: var(--text-light-secondary);
+  --text-muted: var(--text-light-muted);
+  --border-subtle: var(--border-navy);
+  --border-default: var(--border-navy-strong);
 }
 
 @layer base {
@@ -162,17 +263,403 @@
   }
 }
 
-/* Customer theme utilities */
-.bg-ivory { background-color: var(--ivory); }
-.bg-ivory-surface { background-color: var(--ivory-surface); }
-.bg-navy-800 { background-color: var(--navy-800); }
-.bg-navy-900 { background-color: var(--navy-900); }
-.bg-gold { background-color: var(--gold); }
-.text-gold { color: var(--gold); }
-.text-navy-900 { color: var(--navy-900); }
-.border-navy-800 { border-color: var(--navy-800); }
-.border-customer { border-color: var(--customer-border); }
+/* ==================================================
+   CEO驾驶舱主题 Utilities
+   ================================================== */
 
-/* Scrollbar hide utility */
+/* 奶油白背景 utilities */
+.bg-cream { background-color: var(--bg-cream); }
+.bg-cream-warm { background-color: var(--bg-cream-warm); }
+.bg-cream-surface { background-color: var(--bg-cream-surface); }
+
+/* 深蓝舞台 utilities */
+.bg-navy { background-color: var(--bg-navy); }
+.bg-navy-light { background-color: var(--bg-navy-light); }
+.bg-navy-elevated { background-color: var(--bg-navy-elevated); }
+.bg-navy-surface { background-color: var(--bg-navy-surface); }
+
+/* 金色 utilities */
+.bg-gold { background-color: var(--gold-primary); }
+.bg-gold-subtle { background-color: var(--gold-subtle); }
+.text-gold { color: var(--gold-primary); }
+.border-gold { border-color: var(--border-gold); }
+.border-gold-strong { border-color: var(--border-gold-strong); }
+
+/* 浅底文字 */
+.text-dark { color: var(--text-dark); }
+.text-dark-secondary { color: var(--text-dark-secondary); }
+.text-dark-muted { color: var(--text-dark-muted); }
+
+/* 深底文字 */
+.text-light { color: var(--text-light); }
+.text-light-secondary { color: var(--text-light-secondary); }
+.text-light-muted { color: var(--text-light-muted); }
+
+/* 语义色 */
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger { color: var(--danger); }
+
+/* Legacy compat */
+.bg-exec-base { background-color: var(--bg-navy); }
+.bg-exec-panel { background-color: var(--bg-navy-light); }
+.bg-exec-elevated { background-color: var(--bg-navy-elevated); }
+.bg-exec-surface { background-color: var(--bg-navy-surface); }
+.text-exec-primary { color: var(--text-light); }
+.text-exec-secondary { color: var(--text-light-secondary); }
+.text-exec-muted { color: var(--text-light-muted); }
+.text-exec-gold { color: var(--gold-primary); }
+.border-exec-subtle { border-color: var(--border-navy); }
+.border-exec-default { border-color: var(--border-navy-strong); }
+.border-exec-gold { border-color: var(--border-gold); }
+
+/* 数字展示 */
+.font-tabular { font-variant-numeric: tabular-nums; }
+
+/* Scrollbar */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+.scrollbar-exec::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-exec::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-exec::-webkit-scrollbar-thumb { 
+  background: rgba(255,255,255,0.15); 
+  border-radius: 3px; 
+}
+.scrollbar-exec::-webkit-scrollbar-thumb:hover { 
+  background: var(--gold-muted); 
+}
+
+/* ─────────────────────────────────────────────────
+   CEO驾驶舱核心组件样式
+   ───────────────────────────────────────────────── */
+
+/* 驾驶舱主容器 */
+.cockpit-container {
+  background: var(--gradient-navy);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-navy-container);
+  position: relative;
+  overflow: hidden;
+}
+.cockpit-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-navy-glow);
+  pointer-events: none;
+}
+
+/* 奶油白内容卡片（像汇报纸） */
+.report-card {
+  background: var(--bg-cream-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-cream-card);
+  border: 1px solid var(--border-cream);
+}
+
+/* 深蓝内部卡片 */
+.navy-card {
+  background: var(--bg-navy-elevated);
+  border: 1px solid var(--border-navy);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+}
+.navy-card:hover {
+  border-color: var(--border-gold);
+}
+
+/* 快捷按钮（深底+金边） */
+.btn-cockpit {
+  background: var(--bg-navy-surface);
+  border: 1px solid var(--border-navy-strong);
+  color: var(--text-light-secondary);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+.btn-cockpit:hover {
+  border-color: var(--border-gold);
+  color: var(--gold-primary);
+  background: rgba(212,175,55,0.08);
+}
+
+/* 金色主按钮 */
+.btn-gold {
+  background: var(--gold-primary);
+  color: var(--bg-navy);
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-gold-btn);
+  transition: all var(--transition-fast);
+}
+.btn-gold:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -2px rgba(212,175,55,0.4);
+}
+
+/* 大输入框（驾驶舱底部） */
+.input-cockpit {
+  background: var(--bg-cream-surface);
+  border: 1px solid var(--border-cream);
+  border-radius: var(--radius-xl);
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  color: var(--text-dark);
+  width: 100%;
+  transition: all var(--transition-fast);
+}
+.input-cockpit::placeholder {
+  color: var(--text-dark-muted);
+}
+.input-cockpit:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px var(--gold-subtle);
+}
+
+/* 徽章 - 稳步推进（绿色） */
+.badge-progress {
+  background: rgba(34,197,94,0.12);
+  color: #22C55E;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 徽章 - 需关注（琥珀） */
+.badge-attention {
+  background: rgba(245,158,11,0.12);
+  color: #F59E0B;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 徽章 - 金色 */
+.badge-gold {
+  background: var(--gold-subtle);
+  color: var(--gold-primary);
+  border: 1px solid var(--border-gold);
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* 状态点 */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.status-dot-success { background: var(--success); }
+.status-dot-warning { background: var(--warning); }
+.status-dot-danger { background: var(--danger); }
+
+/* 金色高亮卡片（AI执行官消息） */
+.highlight-card {
+  background: linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.08) 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-xl);
+  position: relative;
+}
+.highlight-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  background: var(--gold-primary);
+  border-radius: 2px;
+}
+
+/* 右侧秘书台卡片 */
+.secretary-card {
+  background: var(--bg-cream-surface);
+  border: 1px solid var(--border-cream);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-cream-card);
+}
+
+/* ─────────────────────────────────────────────────
+   V2 精修组件（更紧凑、更高级）
+   ───────────────────────────────────────────────── */
+
+/* 驾驶舱主容器 V2 - 大一体化深蓝舞台 */
+.cockpit-container-v2 {
+  background: linear-gradient(135deg, #0B1220 0%, #0A1018 50%, #0D1525 100%);
+  border-radius: 28px;
+  box-shadow: 
+    0 8px 40px -8px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.03);
+  position: relative;
+  overflow: hidden;
+  min-height: 580px;
+}
+/* 金色光晕 + 微噪点质感 */
+.cockpit-container-v2::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(212,175,55,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(212,175,55,0.06) 0%, transparent 50%);
+  pointer-events: none;
+}
+.cockpit-container-v2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* 快报卡片 V2 - 象牙白底 */
+.report-card-v2 {
+  background: #F7F3E8;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 2px 16px -4px rgba(0,0,0,0.08);
+  border: 1px solid #E8E0D0;
+}
+
+/* 快捷按钮 V2 - 更紧凑 */
+.btn-cockpit-v2 {
+  background: var(--bg-navy-surface);
+  border: 1px solid var(--border-navy-strong);
+  color: var(--text-light-secondary);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+.btn-cockpit-v2:hover {
+  border-color: var(--border-gold);
+  color: var(--gold-primary);
+  background: rgba(212,175,55,0.08);
+}
+
+/* 输入框 V2 - 更高更气派 */
+.input-cockpit-v2 {
+  background: #F7F3E8;
+  border: 1px solid #E8E0D0;
+  border-radius: var(--radius-xl);
+  padding: 1.125rem 1.5rem;
+  font-size: 0.9375rem;
+  color: var(--text-dark);
+  width: 100%;
+  transition: all var(--transition-fast);
+}
+.input-cockpit-v2::placeholder {
+  color: var(--text-dark-muted);
+}
+.input-cockpit-v2:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px var(--gold-subtle);
+}
+
+/* 金色主按钮 V2 */
+.btn-gold-v2 {
+  background: var(--gold-primary);
+  color: var(--bg-navy);
+  font-weight: 600;
+  padding: 1.125rem 1.5rem;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-gold-btn);
+  transition: all var(--transition-fast);
+}
+.btn-gold-v2:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -2px rgba(212,175,55,0.4);
+}
+.btn-gold-v2:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 金色小按钮 */
+.btn-gold-sm {
+  background: var(--gold-primary);
+  color: var(--bg-navy);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px -2px rgba(212,175,55,0.3);
+  transition: all var(--transition-fast);
+}
+.btn-gold-sm:hover {
+  box-shadow: 0 4px 12px -2px rgba(212,175,55,0.4);
+}
+
+/* 秘书台卡片 V2 - 更紧凑 */
+.secretary-card-v2 {
+  background: #F7F3E8;
+  border: 1px solid #E8E0D0;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 8px -2px rgba(0,0,0,0.05);
+}
+
+/* 金色高亮卡片 V2 - 更精致 */
+.highlight-card-v2 {
+  background: linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.06) 100%);
+  border: 1px solid rgba(212,175,55,0.25);
+  border-radius: var(--radius-lg);
+  position: relative;
+}
+.highlight-card-v2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16%;
+  bottom: 16%;
+  width: 2px;
+  background: var(--gold-primary);
+  border-radius: 1px;
+}
+
+/* 警示块 - 警告 */
+.alert-block-warning {
+  background: rgba(245,158,11,0.06);
+  border: 1px solid rgba(245,158,11,0.18);
+  border-radius: var(--radius-md);
+  border-left: 3px solid #F59E0B;
+}
+
+/* 警示块 - 危险 */
+.alert-block-danger {
+  background: rgba(239,68,68,0.05);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: var(--radius-md);
+  border-left: 3px solid #EF4444;
+}
+
+/* 金色微妙背景 */
+.bg-gold-subtle { background-color: rgba(212,175,55,0.1); }
+.border-border-gold { border-color: rgba(212,175,55,0.3); }
+
+/* 动画 */
+@keyframes pulse-gold {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
+.animate-fade-in { animation: fade-in 0.4s ease-out; }

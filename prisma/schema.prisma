@@ -982,6 +982,7 @@ enum CandidateStatus {
   IMPORTED     // 已导入线索库
   EXCLUDED     // 已排除
   EXPIRED      // 已过期
+  ENRICHING    // 等待 getDetails() 补全
 }
 
 enum RadarTaskStatus {
@@ -1161,6 +1162,11 @@ model RadarCandidate {
   importedAt      DateTime?
   importedBy      String?
   
+  // 持续扫描关联
+  profileId       String?  // 触发该候选的 SearchProfile
+  publishedAt     DateTime? // 招标发布时间（从 source 获取）
+  enrichedAt      DateTime? // 详情补全完成时间
+  
   // TTL 策略
   rawData         Json?
   expireAt        DateTime?
@@ -1174,6 +1180,7 @@ model RadarCandidate {
   @@index([tenantId, sourceId])
   @@index([taskId])
   @@index([expireAt])
+  @@index([profileId, status])
 }
 
 // ==================== 正式线索公司 ====================
@@ -1345,8 +1352,44 @@ model RadarSearchProfile {
   scheduleRule    String   @default("0 6 * * *") // 默认每天早6点
   lastRunAt       DateTime?
   
+  // === 持续扫描引擎 ===
+  nextRunAt       DateTime?          // 预计算下次运行时间（索引查询）
+  lockToken       String?            // 乐观锁 UUID
+  lockedAt        DateTime?          // 锁定时间（5分钟超时释放）
+  lockedBy        String?            // Vercel 实例标识
+  maxRunSeconds   Int      @default(45) // 单次扫描预算（留15s给60s timeout）
+  autoQualify     Boolean  @default(true)  // 自动触发 AI 合格化
+  autoEnrich      Boolean  @default(false) // 自动触发详情补全
+  runStats        Json?              // { totalRuns, totalNew, lastError, avgDurationMs }
+  exclusionRules  Json?              // 从 rejected 反向学习的排除词
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
   @@index([tenantId, isActive])
+  @@index([isActive, nextRunAt])
+}
+
+// ==================== 扫描游标（持续增量） ====================
+
+model RadarScanCursor {
+  id           String   @id @default(cuid())
+  profileId    String
+  sourceId     String
+  
+  // 游标状态
+  cursorState  Json     // { nextPage, nextPageToken, since, queryIndex, exhausted }
+  
+  // 统计
+  lastScanAt   DateTime?
+  scanCount    Int      @default(0)
+  totalFetched Int      @default(0)
+  totalNew     Int      @default(0)
+  lastError    String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([profileId, sourceId])
+  @@index([profileId])
 }

@@ -32,6 +32,15 @@ import {
   type ICPData,
 } from '@/actions/radar';
 import { SkillPanel } from '@/components/skills';
+import Link from 'next/link';
+
+// 子模块快捷入口
+const radarModules = [
+  { label: '发现任务', href: '/c/radar/tasks', icon: Search, description: '执行多渠道发现任务' },
+  { label: '候选池', href: '/c/radar/candidates', icon: Users, description: '审核和分层候选' },
+  { label: '线索库', href: '/c/radar/prospects', icon: Building2, description: '管理已导入线索' },
+  { label: '机会池', href: '/c/radar/opportunities', icon: Target, description: '招标机会追踪' },
+];
 
 export default function RadarPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -230,6 +239,25 @@ export default function RadarPage() {
             </div>
             <p className="text-2xl font-bold text-[#0B1B2B]">{stat.value}</p>
           </div>
+        ))}
+      </div>
+
+      {/* Module Navigation */}
+      <div className="grid grid-cols-4 gap-4">
+        {radarModules.map((mod) => (
+          <Link
+            key={mod.label}
+            href={mod.href}
+            className="bg-white rounded-xl border border-[#E7E0D3] p-4 hover:border-[#C7A56A]/50 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-[#F7F3EA] rounded-lg flex items-center justify-center group-hover:bg-[#C7A56A]/10 transition-colors">
+                <mod.icon size={16} className="text-[#C7A56A]" />
+              </div>
+              <h4 className="font-medium text-[#0B1B2B]">{mod.label}</h4>
+            </div>
+            <p className="text-xs text-slate-500">{mod.description}</p>
+          </Link>
         ))}
       </div>
 

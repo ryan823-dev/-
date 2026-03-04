@@ -17,6 +17,7 @@ import {
 } from "@/lib/utils/file-utils";
 import { extractTextFromAsset } from "@/lib/utils/text-extract";
 import { splitTextIntoChunks } from "@/lib/utils/chunk-utils";
+import { requireDecider } from "@/lib/permissions";
 import type {
   FileUploadInput,
   AssetUploadSession,
@@ -278,6 +279,10 @@ export async function updateFolder(
  */
 export async function deleteFolder(id: string): Promise<void> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   // 检查是否有子文件夹
   const childCount = await db.assetFolder.count({
@@ -517,6 +522,10 @@ export async function updateAsset(
  */
 export async function deleteAssets(ids: string[]): Promise<void> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   await db.asset.updateMany({
     where: {

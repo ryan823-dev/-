@@ -24,6 +24,11 @@ import {
   Pencil,
   Check,
   X,
+  Lock,
+  MessageSquarePlus,
+  BarChart3,
+  Radar,
+  ArrowRight,
 } from 'lucide-react';
 import { 
   getCompanyProfile, 
@@ -32,6 +37,11 @@ import {
   updateCompanyProfile,
   type CompanyProfileData 
 } from '@/actions/knowledge';
+import { syncMarketingFromKnowledge, syncRadarFromKnowledge } from '@/actions/sync';
+import { toast } from 'sonner';
+import { getLatestVersion, createVersion } from '@/actions/versions';
+import { CollaborativeShell } from '@/components/collaboration';
+import type { AnchorSpec, ArtifactStatusValue } from '@/types/artifact';
 
 // Supported file formats display
 const SUPPORTED_FORMATS = [
@@ -68,6 +78,16 @@ export default function CompanyKnowledgePage() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 协作相关状态
+  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [activeAnchor, setActiveAnchor] = useState<AnchorSpec | null>(null);
+  const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
+  
+  // 同步状态
+  const [isSyncingMarketing, setIsSyncingMarketing] = useState(false);
+  const [isSyncingRadar, setIsSyncingRadar] = useState(false);
 
   // 加载数据
   const loadData = useCallback(async () => {
@@ -80,6 +100,30 @@ export default function CompanyKnowledgePage() {
       ]);
       setProfile(profileData);
       setAssets(assetsData);
+
+      // 加载最新版本信息
+      if (profileData?.id) {
+        try {
+          const latestVersion = await getLatestVersion('CompanyProfile', profileData.id);
+          if (latestVersion) {
+            setCurrentVersionId(latestVersion.id);
+            const status = latestVersion.status as ArtifactStatusValue;
+            setIsReadOnly(status === 'approved' || status === 'archived');
+          }
+        } catch {
+          // 如果没有版本，创建初始版本
+          if (profileData) {
+            const newVersion = await createVersion(
+              'CompanyProfile',
+              profileData.id,
+              profileData as unknown as Record<string, unknown>,
+              { changeNote: '初始版本' }
+            );
+            setCurrentVersionId(newVersion.id);
+            setIsReadOnly(false);
+          }
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载数据失败');
     } finally {
@@ -143,7 +187,7 @@ export default function CompanyKnowledgePage() {
 
   // 开始编辑某个 section
   const startEditing = (sectionKey: string) => {
-    if (!profile) return;
+    if (!profile || isReadOnly) return;
     const value = profile[sectionKey as keyof CompanyProfileData];
     if (typeof value === 'string') {
       setEditBuffer(value || '');
@@ -159,7 +203,7 @@ export default function CompanyKnowledgePage() {
     setIsSaving(true);
     try {
       const sectionConfig = PROFILE_SECTIONS.find(s => s.key === editingSection);
-      let updatePayload: Record<string, unknown> = {};
+      const updatePayload: Record<string, unknown> = {};
       
       if (sectionConfig?.type === 'text') {
         updatePayload[editingSection] = editBuffer;
@@ -183,7 +227,93 @@ export default function CompanyKnowledgePage() {
     setEditBuffer('');
   };
 
+  // 同步到营销系统
+  const handleSyncMarketing = async () => {
+    if (!profile) return;
+    setIsSyncingMarketing(true);
+    try {
+      const result = await syncMarketingFromKnowledge();
+      if (result.success) {
+        toast.success('已同步到营销系统', {
+          description: `生成 TopicCluster v${result.topicClusterVersionId?.slice(-6)}`,
+          action: {
+            label: '查看',
+            onClick: () => window.location.href = '/c/marketing/topics',
+          },
+        });
+        if (result.openQuestions?.length) {
+          toast.info(`发现 ${result.openQuestions.length} 个待确认问题`, {
+            description: '已创建任务，请在任务中心查看',
+          });
+        }
+      } else {
+        toast.error('同步失败', { description: result.error });
+      }
+    } catch (err) {
+      toast.error('同步失败', { description: err instanceof Error ? err.message : '未知错误' });
+    } finally {
+      setIsSyncingMarketing(false);
+    }
+  };
+
+  // 同步到获客雷达
+  const handleSyncRadar = async () => {
+    if (!profile) return;
+    setIsSyncingRadar(true);
+    try {
+      const result = await syncRadarFromKnowledge();
+      if (result.success) {
+        toast.success('已同步到获客雷达', {
+          description: `生成 TargetingSpec + ChannelMap`,
+          action: {
+            label: '查看',
+            onClick: () => window.location.href = '/c/radar/targeting',
+          },
+        });
+        if (result.openQuestions?.length) {
+          toast.info(`发现 ${result.openQuestions.length} 个待确认问题`, {
+            description: '已创建任务，请在任务中心查看',
+          });
+        }
+      } else {
+        toast.error('同步失败', { description: result.error });
+      }
+    } catch (err) {
+      toast.error('同步失败', { description: err instanceof Error ? err.message : '未知错误' });
+    } finally {
+      setIsSyncingRadar(false);
+    }
+  };
+
   const completeness = calculateCompleteness();
+
+  // 锚点相关函数
+  const handleAnchorClick = (anchor: AnchorSpec) => {
+    setHighlightedSection(anchor.value);
+    // 3秒后清除高亮
+    setTimeout(() => setHighlightedSection(null), 3000);
+  };
+
+  const handleStatusChange = (newStatus: ArtifactStatusValue) => {
+    setIsReadOnly(newStatus === 'approved' || newStatus === 'archived');
+    loadData();
+  };
+
+  const setAnchorForSection = (sectionKey: string, sectionLabel: string) => {
+    if (isReadOnly) return;
+    setActiveAnchor({
+      type: 'jsonPath',
+      value: sectionKey,
+      label: sectionLabel,
+    });
+  };
+
+  const getSectionHighlightClass = (sectionKey: string) => {
+    if (highlightedSection === sectionKey) {
+      return 'ring-2 ring-[#C7A56A] ring-offset-2 transition-all duration-300';
+    }
+    return '';
+  };
 
   if (isLoading) {
     return (
@@ -201,7 +331,40 @@ export default function CompanyKnowledgePage() {
           <h1 className="text-2xl font-bold text-[#0B1B2B]">企业认知</h1>
           <p className="text-sm text-slate-500 mt-1">上传企业资料，AI自动提炼企业能力画像，支持逐段编辑</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Sync Buttons */}
+          {profile && (
+            <div className="flex items-center gap-2 mr-4">
+              <button
+                onClick={handleSyncMarketing}
+                disabled={isSyncingMarketing || completeness < 30}
+                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#0B1B2B] to-[#10263B] text-[#C7A56A] rounded-xl text-xs font-medium hover:shadow-lg hover:shadow-[#C7A56A]/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                title={completeness < 30 ? '知识完整度需达到30%' : '同步到营销系统'}
+              >
+                {isSyncingMarketing ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <BarChart3 size={14} />
+                )}
+                <span>营销系统</span>
+                <ArrowRight size={12} />
+              </button>
+              <button
+                onClick={handleSyncRadar}
+                disabled={isSyncingRadar || completeness < 30}
+                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#0B1B2B] to-[#10263B] text-emerald-400 rounded-xl text-xs font-medium hover:shadow-lg hover:shadow-emerald-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                title={completeness < 30 ? '知识完整度需达到30%' : '同步到获客雷达'}
+              >
+                {isSyncingRadar ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Radar size={14} />
+                )}
+                <span>获客雷达</span>
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-400">知识完整度</span>
             <div className="w-32 h-2 bg-[#E7E0D3] rounded-full overflow-hidden">
@@ -233,9 +396,20 @@ export default function CompanyKnowledgePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      {/* Read-only Banner */}
+      {isReadOnly && (
+        <div className="bg-[#C7A56A]/10 border border-[#C7A56A]/30 rounded-xl p-4 flex items-center gap-3">
+          <Lock className="text-[#C7A56A] shrink-0" size={20} />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-[#0B1B2B]">此版本已批准 · 内容已锁定</p>
+            <p className="text-xs text-slate-500">如需修改，请在协作面板中创建新版本</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-[280px_1fr_320px] gap-6">
         {/* Left: Document Management */}
-        <div className="col-span-1 space-y-6">
+        <div className="space-y-6">
           {/* Upload Zone - Link to Assets */}
           <div className="bg-[#FFFCF6] rounded-2xl border border-[#E7E0D3] p-6">
             <h3 className="font-bold text-[#0B1B2B] mb-4">上传企业资料</h3>
@@ -324,8 +498,8 @@ export default function CompanyKnowledgePage() {
           </div>
         </div>
 
-        {/* Right: Company Profile (企业能力画像) */}
-        <div className="col-span-2 space-y-6">
+        {/* Center: Company Profile (企业能力画像) */}
+        <div className="space-y-6">
           {!profile ? (
             <div className="bg-[#FFFCF6] rounded-2xl border border-[#E7E0D3] p-12 text-center">
               <Building2 size={48} className="text-slate-300 mx-auto mb-4" />
@@ -407,18 +581,31 @@ export default function CompanyKnowledgePage() {
                   const items = Array.isArray(value) ? value : [];
 
                   return (
-                    <div key={section.key} className="bg-[#FFFCF6] rounded-2xl border border-[#E7E0D3] p-4 relative group">
+                    <div 
+                      key={section.key} 
+                      className={`bg-[#FFFCF6] rounded-2xl border border-[#E7E0D3] p-4 relative group ${getSectionHighlightClass(section.key)}`}
+                      data-section-key={section.key}
+                    >
                       <div className="flex items-center gap-2 mb-3">
                         <SectionIcon size={16} className="text-[#C7A56A]" />
                         <h4 className="font-bold text-[#0B1B2B] text-sm">{section.label}</h4>
-                        {!isEditing && (
-                          <button
-                            onClick={() => startEditing(section.key)}
-                            className="ml-auto p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-[#C7A56A] transition-all"
-                            title="编辑此部分"
-                          >
-                            <Pencil size={13} />
-                          </button>
+                        {!isEditing && !isReadOnly && (
+                          <>
+                            <button
+                              onClick={() => setAnchorForSection(section.key, section.label)}
+                              className="p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-blue-500 transition-all"
+                              title="添加评论"
+                            >
+                              <MessageSquarePlus size={13} />
+                            </button>
+                            <button
+                              onClick={() => startEditing(section.key)}
+                              className="p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-[#C7A56A] transition-all"
+                              title="编辑此部分"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </>
                         )}
                       </div>
 
@@ -596,6 +783,24 @@ export default function CompanyKnowledgePage() {
                 )}
               </div>
             </>
+          )}
+        </div>
+
+        {/* Right: Collaborative Shell */}
+        <div className="space-y-6">
+          {profile?.id && currentVersionId && (
+            <CollaborativeShell
+              entityType="CompanyProfile"
+              entityId={profile.id}
+              versionId={currentVersionId}
+              anchorType="jsonPath"
+              activeAnchor={activeAnchor}
+              onAnchorClick={handleAnchorClick}
+              onStatusChange={handleStatusChange}
+              onVersionChange={(verId) => setCurrentVersionId(verId)}
+              variant="light"
+              className="sticky top-6"
+            />
           )}
         </div>
       </div>

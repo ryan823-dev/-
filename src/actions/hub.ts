@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { EVENT_CATEGORIES } from "@/lib/utils/activity-logger";
 
 // ===================== Types =====================
 
@@ -231,6 +232,10 @@ export type RecentActivity = {
   metadata: Record<string, unknown>;
   createdAt: Date;
   userName?: string;
+  // Phase 3 扩展字段
+  eventCategory?: string;
+  severity?: string;
+  context?: Record<string, unknown>;
 };
 
 export async function getRecentActivity(limit: number = 10): Promise<RecentActivity[]> {
@@ -260,6 +265,10 @@ export async function getRecentActivity(limit: number = 10): Promise<RecentActiv
     metadata: a.metadata as Record<string, unknown>,
     createdAt: a.createdAt,
     userName: a.user.name || undefined,
+    // Phase 3 扩展字段
+    eventCategory: a.eventCategory || undefined,
+    severity: a.severity || undefined,
+    context: a.context as Record<string, unknown> | undefined,
   }));
 }
 

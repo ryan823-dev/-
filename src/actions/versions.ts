@@ -314,3 +314,109 @@ export async function getVersionStats(): Promise<{
     ),
   };
 }
+
+// ==================== 更新版本内容（创建新版本） ====================
+
+/**
+ * 更新 ArtifactVersion 内容
+ * 由于 ArtifactVersion 是不可变的，更新内容会创建一个新版本
+ */
+export async function updateVersionContent(
+  versionId: string,
+  content: Record<string, unknown>,
+  changeNote?: string
+): Promise<ArtifactVersionData> {
+  const session = await getSession();
+
+  // 获取当前版本
+  const currentVersion = await prisma.artifactVersion.findFirst({
+    where: {
+      id: versionId,
+      tenantId: session.user.tenantId,
+    },
+  });
+
+  if (!currentVersion) {
+    throw new Error("版本不存在");
+  }
+
+  // 如果当前版本是 draft 状态，直接更新
+  if (currentVersion.status === "draft") {
+    const updated = await prisma.artifactVersion.update({
+      where: { id: versionId },
+      data: {
+        content: content as object,
+        meta: {
+          ...(currentVersion.meta as object || {}),
+          changeNote: changeNote || "内容已更新",
+          lastEditedAt: new Date().toISOString(),
+          lastEditedBy: session.user.id,
+        },
+      },
+      include: {
+        createdBy: { select: { name: true } },
+      },
+    });
+    return toVersionData(updated);
+  }
+
+  // 如果不是 draft，创建新版本
+  const latestVersion = await prisma.artifactVersion.findFirst({
+    where: {
+      tenantId: session.user.tenantId,
+      entityType: currentVersion.entityType,
+      entityId: currentVersion.entityId,
+    },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+
+  const newVersionNumber = (latestVersion?.version ?? 0) + 1;
+
+  const newVersion = await prisma.artifactVersion.create({
+    data: {
+      tenantId: session.user.tenantId,
+      entityType: currentVersion.entityType,
+      entityId: currentVersion.entityId,
+      version: newVersionNumber,
+      status: "draft",
+      content: content as object,
+      meta: {
+        changeNote: changeNote || `基于版本 ${currentVersion.version} 编辑`,
+        generatedBy: "human",
+        baseVersionId: versionId,
+      },
+      createdById: session.user.id,
+    },
+    include: {
+      createdBy: { select: { name: true } },
+    },
+  });
+
+  return toVersionData(newVersion);
+}
+
+// ==================== 获取最新 EntityType 版本（跨 entityId）====================
+
+/**
+ * 获取某个 EntityType 的最新版本（不限定 entityId）
+ * 用于获取如 TopicCluster、TargetingSpec 等唯一实体的最新版本
+ */
+export async function getLatestVersionByEntityType(
+  entityType: EntityType
+): Promise<ArtifactVersionData | null> {
+  const session = await getSession();
+
+  const version = await prisma.artifactVersion.findFirst({
+    where: {
+      tenantId: session.user.tenantId,
+      entityType,
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      createdBy: { select: { name: true } },
+    },
+  });
+
+  return version ? toVersionData(version) : null;
+}

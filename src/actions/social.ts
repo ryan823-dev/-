@@ -7,6 +7,7 @@ import { generateMultiPlatformContent } from "@/lib/services/openai.service";
 import * as facebookService from "@/lib/services/facebook.service";
 import * as twitterService from "@/lib/services/twitter.service";
 import { formatPublishError } from "@/lib/utils/social.utils";
+import { requireDecider } from "@/lib/permissions";
 
 const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -177,6 +178,10 @@ export async function deleteSocialPost(postId: string) {
   if (isDemoMode) return;
 
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   await db.socialPost.update({
     where: { id: postId, tenantId: session.user.tenantId },
@@ -203,6 +208,10 @@ export async function publishSocialPost(postId: string): Promise<{
   }
 
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   const post = await db.socialPost.findFirst({
     where: { id: postId, tenantId: session.user.tenantId, deletedAt: null },

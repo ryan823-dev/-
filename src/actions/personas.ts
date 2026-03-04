@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { chatCompletion } from "@/lib/ai-client";
+import { logActivity, ACTIVITY_ACTIONS, EVENT_CATEGORIES } from "@/lib/utils/activity-logger";
+import { requireDecider } from "@/lib/permissions";
 import type {
   ICPSegmentData,
   CreateICPSegmentInput,
@@ -61,6 +63,18 @@ export async function createICPSegment(input: CreateICPSegmentInput): Promise<IC
     include: { _count: { select: { personas: true } } },
   });
 
+  // Fire-and-forget activity log
+  logActivity({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+    action: "icp_segment.created",
+    entityType: "ICPSegment",
+    entityId: s.id,
+    eventCategory: EVENT_CATEGORIES.KNOWLEDGE,
+    severity: "info",
+    context: { name: s.name, industry: s.industry },
+  });
+
   revalidatePath("/zh-CN/knowledge");
 
   return {
@@ -86,6 +100,10 @@ export async function updateICPSegment(id: string, input: Partial<CreateICPSegme
 
 export async function deleteICPSegment(id: string): Promise<void> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
   await db.iCPSegment.delete({ where: { id, tenantId: session.user.tenantId } });
   revalidatePath("/zh-CN/knowledge");
 }
@@ -127,6 +145,18 @@ export async function createPersona(input: CreatePersonaInput): Promise<PersonaD
     include: { segment: { select: { name: true } } },
   });
 
+  // Fire-and-forget activity log
+  logActivity({
+    tenantId: session.user.tenantId,
+    userId: session.user.id,
+    action: "persona.created",
+    entityType: "Persona",
+    entityId: p.id,
+    eventCategory: EVENT_CATEGORIES.KNOWLEDGE,
+    severity: "info",
+    context: { name: p.name, title: p.title },
+  });
+
   revalidatePath("/zh-CN/knowledge");
 
   return {
@@ -153,6 +183,10 @@ export async function updatePersona(id: string, input: Partial<CreatePersonaInpu
 
 export async function deletePersona(id: string): Promise<void> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
   await db.persona.delete({ where: { id, tenantId: session.user.tenantId } });
   revalidatePath("/zh-CN/knowledge");
 }

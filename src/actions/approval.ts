@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { logActivity, ACTIVITY_ACTIONS, EVENT_CATEGORIES } from "@/lib/utils/activity-logger";
 import { isValidTransition, type ArtifactStatusValue } from "@/types/artifact";
+import { requireDecider } from "@/lib/permissions";
 
 // ==================== Types ====================
 
@@ -44,6 +45,10 @@ export async function requestChanges(
   note: string
 ): Promise<ApprovalResult> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   // 1. 获取版本信息
   const version = await prisma.artifactVersion.findUnique({
@@ -125,6 +130,10 @@ export async function requestChanges(
  */
 export async function approveVersion(versionId: string): Promise<ApprovalResult> {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
 
   // 1. 获取版本信息
   const version = await prisma.artifactVersion.findUnique({

@@ -63,24 +63,33 @@ export class AISearchAdapter implements RadarAdapter {
     // Step 1: AI 生成多语言搜索查询
     const searchQueries = await this.generateSearchQueries(query);
     
+    // 游标支持：从上次的 queryIndex 继续
+    const startIndex = query.cursor?.queryIndex ?? 0;
+    const queriesToRun = searchQueries.slice(startIndex, startIndex + 3);
+    
     // Step 2: 执行搜索
-    const searchResults = await this.executeSearches(searchQueries, query);
+    const searchResults = await this.executeSearches(queriesToRun, query);
     
     // Step 3: AI 解析搜索结果，提取招标信息
     const tenders = await this.parseSearchResults(searchResults, query);
     
     const duration = Date.now() - startTime;
+    const nextQueryIndex = startIndex + queriesToRun.length;
+    const allExhausted = nextQueryIndex >= searchQueries.length;
     
     return {
       items: tenders,
       total: tenders.length,
-      hasMore: false,
+      hasMore: !allExhausted,
       metadata: {
         source: this.sourceCode,
         query,
         fetchedAt: new Date(),
         duration,
       },
+      // 持续扫描游标
+      nextCursor: allExhausted ? undefined : { queryIndex: nextQueryIndex },
+      isExhausted: allExhausted,
     };
   }
 

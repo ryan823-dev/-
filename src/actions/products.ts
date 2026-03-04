@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { requireDecider } from "@/lib/permissions";
 
 async function getSession() {
   const session = await auth();
@@ -85,6 +86,10 @@ export async function updateProduct(
 
 export async function deleteProduct(id: string) {
   const session = await getSession();
+  const roleCheck = requireDecider(session);
+  if (!roleCheck.authorized) {
+    throw new Error(roleCheck.error);
+  }
   await db.product.update({
     where: { id },
     data: { deletedAt: new Date(), tenantId: session.user.tenantId },
