@@ -46,6 +46,7 @@ export default function RadarPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pipelineStatus, setPipelineStatus] = useState<RadarPipelineStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pipelineLoaded, setPipelineLoaded] = useState(false);
 
   // 加载流水线状态
   const loadPipelineStatus = useCallback(async (showRefreshing = false) => {
@@ -61,6 +62,7 @@ export default function RadarPage() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setPipelineLoaded(true);
     }
   }, []);
 
@@ -73,10 +75,50 @@ export default function RadarPage() {
     loadPipelineStatus(true);
   };
 
-  if (isLoading || !pipelineStatus) {
+  if (isLoading && !pipelineLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 text-[#C7A56A] animate-spin" />
+      </div>
+    );
+  }
+
+  // pipeline 加载失败时显示错误提示和基础导航
+  if (!pipelineStatus && pipelineLoaded) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] p-6 space-y-6">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+            <AlertTriangle className="text-red-500 shrink-0" size={20} />
+            <p className="text-sm text-red-700 flex-1">{error}</p>
+            <button 
+              onClick={() => loadPipelineStatus()} 
+              className="text-red-600 hover:text-red-800 text-sm font-medium"
+            >
+              重试
+            </button>
+          </div>
+        )}
+        <div className="bg-white rounded-2xl border border-[#E7E0D3] p-5">
+          <h3 className="font-bold text-[#0B1B2B] mb-4">快捷入口</h3>
+          <div className="grid grid-cols-4 gap-4">
+            {radarModules.map((mod) => (
+              <Link
+                key={mod.label}
+                href={mod.href}
+                className="p-4 rounded-xl border border-[#E7E0D3] hover:border-[#C7A56A]/50 hover:shadow-md transition-all group bg-[#FFFCF6]"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 bg-[#F7F3EA] rounded-lg flex items-center justify-center group-hover:bg-[#C7A56A]/10 transition-colors">
+                    <mod.icon size={18} className="text-[#C7A56A]" />
+                  </div>
+                  <h4 className="font-medium text-[#0B1B2B]">{mod.label}</h4>
+                </div>
+                <p className="text-xs text-slate-500">{mod.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
