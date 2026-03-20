@@ -117,7 +117,7 @@ export class SAMGovAdapter implements RadarAdapter {
       return {
         items,
         total: data.totalRecords || items.length,
-        hasMore: data.page && data.page.currentPage < data.page.totalPages,
+        hasMore: !!(data.page && data.page.currentPage < data.page.totalPages),
         nextCursor: data.page ? { nextPage: data.page.currentPage + 1 } : undefined,
         metadata: {
           source: this.sourceCode,
@@ -314,11 +314,12 @@ export class SAMGovAdapter implements RadarAdapter {
   /**
    * 推断买家类型
    */
-  private inferBuyerType(orgType?: string): string {
+  private inferBuyerType(orgType?: string): 'government' | 'enterprise' | 'ngo' | 'international_org' {
     if (!orgType) return 'government';
     const type = orgType.toLowerCase();
-    if (type.includes('defense') || type.includes('military')) return 'military';
-    if (type.includes('state') || type.includes('local')) return 'local_government';
+    if (type.includes('defense') || type.includes('military')) return 'government';
+    if (type.includes('state') || type.includes('local')) return 'government';
+    if (type.includes('nonprofit') || type.includes('ngo')) return 'ngo';
     return 'government';
   }
 

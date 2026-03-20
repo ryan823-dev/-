@@ -1,10 +1,12 @@
 // ==================== TED Adapter ====================
 // 欧盟招标电子日报适配器
+// 官方 API 文档: https://docs.ted.europa.eu/api/latest/search.html
+// 数据源类型: 官方API (无需认证即可搜索)
 
-import type { 
-  RadarAdapter, 
-  RadarSearchQuery, 
-  RadarSearchResult, 
+import type {
+  RadarAdapter,
+  RadarSearchQuery,
+  RadarSearchResult,
   NormalizedCandidate,
   CandidateDetails,
   HealthStatus,
@@ -12,10 +14,14 @@ import type {
   AdapterConfig,
 } from './types';
 
+// 数据源类型标注
+export const TED_SOURCE_TYPE = 'OFFICIAL_API' as const;
+export const TED_REQUIRES_AUTH = false;
+
 export class TEDAdapter implements RadarAdapter {
   readonly sourceCode = 'ted';
   readonly channelType = 'TENDER' as const;
-  
+
   readonly supportedFeatures: AdapterFeatures = {
     supportsKeywordSearch: true,
     supportsCategoryFilter: true,
@@ -31,7 +37,8 @@ export class TEDAdapter implements RadarAdapter {
   private timeout: number;
 
   constructor(config: AdapterConfig) {
-    this.apiEndpoint = config.apiEndpoint || 'https://ted.europa.eu/api/v3.0';
+    // TED API v3 正确端点
+    this.apiEndpoint = config.apiEndpoint || 'https://api.ted.europa.eu';
     this.timeout = config.timeout || 30000;
   }
 
@@ -88,7 +95,8 @@ export class TEDAdapter implements RadarAdapter {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(`${this.apiEndpoint}/notices/search`, {
+      // TED API v3 正确路径: /v3/notices/search
+      const response = await fetch(`${this.apiEndpoint}/v3/notices/search`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -142,7 +150,8 @@ export class TEDAdapter implements RadarAdapter {
   }
 
   async getDetails(externalId: string): Promise<CandidateDetails | null> {
-    const url = `${this.apiEndpoint}/notices/${externalId}`;
+    // TED API v3 详情路径
+    const url = `${this.apiEndpoint}/v3/notices/${externalId}`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -259,7 +268,7 @@ export class TEDAdapter implements RadarAdapter {
     const startTime = Date.now();
     
     try {
-      const response = await fetch(`${this.apiEndpoint}/notices/search`, {
+      const response = await fetch(`${this.apiEndpoint}/v3/notices/search`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -34,6 +34,7 @@
     "dotenv": "^17.2.4",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.563.0",
+    "markitdown": "^0.0.4",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "next-intl": "^4.8.2",

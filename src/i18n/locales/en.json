@@ -74,6 +74,7 @@
     "settingsWebsite": "Website",
     "admin": "Admin",
     "adminTenants": "Tenants",
+    "adminApiKeys": "API Keys",
     "adminSystem": "System"
   },
   "dashboard": {

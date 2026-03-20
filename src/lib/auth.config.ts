@@ -4,7 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 // Cross-platform JWT configuration (shared with Vertax)
 // Both Tower and Vertax must use the same JWT_SECRET
 export const CROSS_PLATFORM_JWT_CONFIG = {
-  secret: process.env.JWT_SECRET || "vertax-jwt-secret-change-in-production",
+  secret: process.env.JWT_SECRET,
   issuer: "vertax.top",
   audience: "vertax-platform",
 };

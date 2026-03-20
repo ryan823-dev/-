@@ -3,6 +3,60 @@
 
 import type { ChannelType, AdapterType, RadarStoragePolicy } from '@/generated/prisma/enums';
 
+// ==================== 数据源类型标注 ====================
+
+/**
+ * 数据源类型
+ * 
+ * OFFICIAL_API: 官方API，有明确的API文档和认证方式
+ * - 示例：TED, SAM.gov, Google Places
+ * - 数据质量：高，直接来自源头
+ * - 需要认证：通常需要
+ * 
+ * PUBLIC_DATA: 公开数据，无需认证即可访问
+ * - 示例：UNGM公开端点, 政府网站RSS
+ * - 数据质量：高
+ * - 需要认证：否
+ * 
+ * WEB_SCRAPING: 网页抓取，从公开网页提取数据
+ * - 示例：政府采购网站、展会参展商列表
+ * - 数据质量：中等，取决于网页结构
+ * - 需要认证：否
+ * 
+ * AI_INFERRED: AI推断，通过搜索引擎+AI分析获取
+ * - 示例：新兴市场采购、海关数据、招聘信号
+ * - 数据质量：不稳定，可能存在幻觉
+ * - 需要认证：搜索引擎API Key
+ */
+export type SourceDataType = 'OFFICIAL_API' | 'PUBLIC_DATA' | 'WEB_SCRAPING' | 'AI_INFERRED';
+
+/**
+ * 数据质量等级
+ */
+export type DataQualityLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNSTABLE';
+
+/**
+ * 数据源可靠性描述
+ */
+export interface SourceReliability {
+  /** 数据源类型 */
+  dataType: SourceDataType;
+  /** 数据质量等级 */
+  qualityLevel: DataQualityLevel;
+  /** 是否需要认证 */
+  requiresAuth: boolean;
+  /** 认证方式描述 */
+  authMethod?: string;
+  /** 数据更新频率 */
+  updateFrequency?: 'REAL_TIME' | 'DAILY' | 'WEEKLY' | 'UNKNOWN';
+  /** 覆盖范围描述 */
+  coverageNote?: string;
+  /** 已知限制 */
+  limitations?: string[];
+  /** 官方文档链接 */
+  docUrl?: string;
+}
+
 // ==================== 适配器能力 ====================
 
 export interface AdapterFeatures {
@@ -110,7 +164,16 @@ export interface NormalizedCandidate {
     channel?: string;
     reasons?: string[];
     matchedKeywords?: string[];
+    // 适配器特定字段
+    jobTitles?: string[];
+    importProducts?: string[];
+    showName?: string;
+    suppliers?: string[];
+    products?: string[];
   };
+  
+  // 匹配分数
+  matchScore?: number;
   
   // 原始数据
   rawData?: Record<string, unknown>;
@@ -134,6 +197,7 @@ export interface HealthStatus {
   healthy: boolean;
   latency: number;
   error?: string;
+  message?: string;  // 添加 message 字段
   lastCheckedAt?: Date;
 }
 
@@ -177,6 +241,12 @@ export interface AdapterConfig {
     maxRetries: number;
     retryDelay: number;
   };
+  // 适配器特定配置
+  banks?: string[];      // 开发银行适配器
+  regions?: string[];    // 新兴市场适配器
+  countries?: string[];  // 国家过滤
+  clientId?: string;     // UNGM OAuth
+  clientSecret?: string; // UNGM OAuth
 }
 
 // ==================== 适配器注册信息 ====================
@@ -197,6 +267,8 @@ export interface AdapterRegistration {
   isOfficial: boolean;
   websiteUrl?: string;
   termsUrl?: string;
+  // === 数据源可靠性标注 ===
+  reliability: SourceReliability;
 }
 
 // ==================== 适配器工厂 ====================

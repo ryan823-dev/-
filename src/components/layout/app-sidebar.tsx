@@ -26,6 +26,7 @@ import {
   Brain,
   Radar,
   TrendingUp,
+  Key,
 } from "lucide-react";
 import { isPlatformAdmin } from "@/lib/permissions";
 import {
@@ -197,6 +198,11 @@ export function AppSidebar() {
           title: t("adminTenants"),
           url: "/zh-CN/admin/tenants",
           icon: Users,
+        },
+        {
+          title: t("adminApiKeys"),
+          url: "/zh-CN/admin/api-keys",
+          icon: Key,
         },
         {
           title: t("adminSystem"),

@@ -78,6 +78,7 @@
     "settingsWebsite": "网站配置",
     "admin": "平台管理",
     "adminTenants": "租户管理",
+    "adminApiKeys": "API密钥管理",
     "adminSystem": "系统设置"
   },
   "dashboard": {

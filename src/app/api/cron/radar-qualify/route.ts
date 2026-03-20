@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAdapterRegistration, ensureAdaptersInitialized } from '@/lib/radar/adapters';
+import { Prisma } from '@prisma/client';
 
 const MAX_RUN_SECONDS = 50;
 const MAX_BATCH_SIZE = 50;
@@ -225,7 +226,7 @@ async function scoreCandidate(
     industry?: string | null;
     matchScore?: number | null;
     description?: string | null;
-    matchExplain?: { channel?: string } | null;
+    matchExplain?: Prisma.JsonValue | null;
   },
   profile: { targetCountries: string[]; industryCodes: string[]; exclusionRules: unknown; tenantId: string }
 ): Promise<'A' | 'B' | 'C' | 'excluded'> {
@@ -259,7 +260,10 @@ async function scoreCandidate(
   if (candidate.email) score += config.contactScoring.hasEmail;
 
   // ========== 信号来源加分 ==========
-  const channel = candidate.matchExplain?.channel;
+  const matchExplainObj = candidate.matchExplain && typeof candidate.matchExplain === 'object' && !Array.isArray(candidate.matchExplain) 
+    ? candidate.matchExplain as { channel?: string } 
+    : null;
+  const channel = matchExplainObj?.channel;
   if (channel && config.channelScoring) {
     const channelScore = config.channelScoring[channel as keyof typeof config.channelScoring];
     if (channelScore) {

@@ -1412,7 +1412,10 @@ model ApiKeyConfig {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
 
   // 服务名称
-  service     String   @unique // google_places, apollo, skrapp, hunter, brave_search, firecrawl
+  service     String   @unique // google_places, apollo, skrapp, hunter, brave_search, firecrawl, tavily, exa
+  
+  // 分类
+  category    String   @default("other") // AI Provider, 搜索 API, 企业数据, 政府采购
 
   // 密钥（加密存储）
   apiKey      String?
@@ -1432,6 +1435,9 @@ model ApiKeyConfig {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([service])
+  @@index([isEnabled])
+  @@index([category])
   @@map("api_key_configs")
 }
 

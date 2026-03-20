@@ -6,8 +6,10 @@
  * 第1层：官方/公共免费源（完全免费）
  *   - 无需API Key
  *
- * 第2层：自建网页抓取（自建，免费）
- *   - 官网首页/产品页
+ * 第2层：自建网页抓取（自建，免费）✅ 已实现
+ *   - 官网首页/产品页抓取
+ *   - 支持微信公众号、知乎、掘金等
+ *   - 三级降级：Jina Reader → 自建抓取 → 静态抓取
  *
  * 第3层：有免费额度的 API
  *   - Apollo.io（公司+联系人，50次/月免费）
@@ -18,6 +20,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { scrapeCompanyInfo, fetchWebContent } from './web-scraper';
 
 // ==================== 类型定义 ====================
 
@@ -87,6 +90,17 @@ export async function enrichCompany(
       }
     }
 
+    // 第2层：自建网页抓取（免费，优先级提高）
+    // 在调用付费 API 之前，先尝试从官网抓取信息
+    if (!result.data.description || !result.data.products || !result.data.industries) {
+      const websiteUrl = result.data.website as string || `https://${domain}`;
+      const scrapeResult = await enrichFromWebsite(websiteUrl);
+      if (scrapeResult.success) {
+        mergeEnrichment(result, scrapeResult);
+        // 网页抓取免费，不计入 cost
+      }
+    }
+
     // 第3层：Apollo.io（数据最全）
     if (usePaidSources && totalCost < maxCost) {
       const apolloResult = await enrichFromApollo(domain);
@@ -114,8 +128,17 @@ export async function enrichCompany(
       }
     }
 
-    // 查找联系人
-    if (findContacts && result.data.apolloId) {
+    // 第3层：People Data Labs（联系人丰富化）
+    if (usePaidSources && findContacts && totalCost < maxCost) {
+      const pdlResult = await enrichFromPDL(domain);
+      if (pdlResult.success) {
+        mergeEnrichment(result, pdlResult);
+        totalCost += pdlResult.cost;
+      }
+    }
+
+    // 查找联系人（Apollo 备选）
+    if (findContacts && result.data.apolloId && !result.data.contacts) {
       const contacts = await getContactsFromApollo(result.data.apolloId as string);
       if (contacts.length > 0) {
         result.data.contacts = contacts;
@@ -217,6 +240,66 @@ async function enrichFromGooglePlaces(domain: string): Promise<EnrichmentResult>
     }
   } catch (error) {
     console.error('[Enrichment] Google Places error:', error);
+  }
+
+  return result;
+}
+
+/**
+ * 第2层：网站抓取数据源（免费）
+ * 从公司官网提取信息：描述、产品、行业、联系方式等
+ */
+async function enrichFromWebsite(websiteUrl: string): Promise<EnrichmentResult> {
+  const result: EnrichmentResult = {
+    success: false,
+    data: {},
+    sources: [],
+    cost: 0, // 免费
+  };
+
+  try {
+    const companyInfo = await scrapeCompanyInfo(websiteUrl);
+
+    if (companyInfo.name) {
+      result.data.name = companyInfo.name;
+    }
+    if (companyInfo.description) {
+      result.data.description = companyInfo.description;
+    }
+    if (companyInfo.phone && !result.data.phone) {
+      result.data.phone = companyInfo.phone;
+    }
+    if (companyInfo.email && !result.data.email) {
+      result.data.email = companyInfo.email;
+    }
+    if (companyInfo.address) {
+      result.data.address = companyInfo.address;
+    }
+    if (companyInfo.city) {
+      result.data.city = companyInfo.city;
+    }
+    if (companyInfo.country) {
+      result.data.country = companyInfo.country;
+    }
+    if (companyInfo.products && companyInfo.products.length > 0) {
+      result.data.products = companyInfo.products;
+    }
+    if (companyInfo.industries && companyInfo.industries.length > 0) {
+      result.data.industries = companyInfo.industries;
+      // 取第一个行业作为主行业
+      result.data.industry = companyInfo.industries[0];
+    }
+    if (companyInfo.socialLinks?.linkedin) {
+      result.data.linkedin = companyInfo.socialLinks.linkedin;
+    }
+
+    // 只有成功提取到至少一个字段才算成功
+    if (Object.keys(result.data).length > 0) {
+      result.sources.push('Website Scraper');
+      result.success = true;
+    }
+  } catch (error) {
+    console.error('[Enrichment] Website scraper error:', error);
   }
 
   return result;
@@ -352,34 +435,97 @@ async function enrichFromHunter(domain: string): Promise<EnrichmentResult> {
   };
 
   try {
-    const apiKey = await getApiKey('hunter');
+    // 直接使用适配器
+    const { HunterAdapter } = await import('@/lib/radar/adapters/hunter');
+    const adapter = new HunterAdapter({});
 
-    if (!apiKey) {
-      return result;
-    }
+    const searchResult = await adapter.search({
+      keywords: [domain],
+      pageSize: 5,
+    });
 
-    const response = await fetch(
-      `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${apiKey}`
-    );
-
-    if (!response.ok) {
-      return result;
-    }
-
-    const data = await response.json();
-
-    if (data.data?.emails && data.data.emails.length > 0) {
-      const firstEmail = data.data.emails[0];
-      result.data.email = firstEmail.value;
+    if (searchResult.items && searchResult.items.length > 0) {
+      const contact = searchResult.items[0];
+      result.data.email = contact.email;
+      
+      if (contact.phone) {
+        result.data.phone = contact.phone;
+      }
+      
+      // 获取所有邮箱作为联系人
+      result.data.contacts = searchResult.items.slice(0, 5).map(c => ({
+        email: c.email,
+        name: c.displayName,
+        title: c.contactRole,
+      }));
 
       result.sources.push('Hunter.io');
       result.success = true;
       result.cost = 0.02;
-
-      await updateApiUsage('hunter');
     }
   } catch (error) {
     console.error('[Enrichment] Hunter error:', error);
+  }
+
+  return result;
+}
+
+/**
+ * People Data Labs 数据源（联系人丰富化）
+ */
+async function enrichFromPDL(domain: string): Promise<EnrichmentResult> {
+  const result: EnrichmentResult = {
+    success: false,
+    data: {},
+    sources: [],
+    cost: 0,
+  };
+
+  try {
+    const { PeopleDataLabsAdapter } = await import('@/lib/radar/adapters/pdl');
+    const adapter = new PeopleDataLabsAdapter({});
+
+    // 搜索该公司的员工
+    const contacts = await adapter.searchByCompany(domain, {
+      limit: 10,
+    });
+
+    if (contacts && contacts.length > 0) {
+      // 按职位排序，优先决策者
+      const sortedContacts = contacts.sort((a, b) => {
+        const seniorityOrder = ['ceo', 'cto', 'cfo', 'vp', 'director', 'manager'];
+        const aTitle = (a.contactRole || '').toLowerCase();
+        const bTitle = (b.contactRole || '').toLowerCase();
+        
+        const aScore = seniorityOrder.findIndex(s => aTitle.includes(s));
+        const bScore = seniorityOrder.findIndex(s => bTitle.includes(s));
+        
+        return (aScore === -1 ? 99 : aScore) - (bScore === -1 ? 99 : bScore);
+      });
+
+      result.data.contacts = sortedContacts.slice(0, 5).map(c => ({
+        email: c.email,
+        name: c.displayName,
+        title: c.contactRole,
+        phone: c.phone,
+        linkedin: c.rawData?.linkedin_url,
+      }));
+
+      // 使用第一个联系人的信息补充
+      const firstContact = sortedContacts[0];
+      if (firstContact.email && !result.data.email) {
+        result.data.email = firstContact.email;
+      }
+      if (firstContact.industry && !result.data.industry) {
+        result.data.industry = firstContact.industry;
+      }
+
+      result.sources.push('People Data Labs');
+      result.success = true;
+      result.cost = 0.05;
+    }
+  } catch (error) {
+    console.error('[Enrichment] PDL error:', error);
   }
 
   return result;
