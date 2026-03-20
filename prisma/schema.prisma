@@ -1435,7 +1435,6 @@ model ApiKeyConfig {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([service])
   @@index([isEnabled])
   @@index([category])
   @@map("api_key_configs")
@@ -1482,6 +1481,45 @@ model OutreachRecord {
   @@map("outreach_records")
 }
 
+// ==================== 邮件外联序列 ====================
+
+model SequenceInstance {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  tenantId    String
+
+  // 序列信息
+  sequenceName String
+  sequenceConfig Json  // 序列配置 JSON
+  candidateIds String[] // 目标候选人 IDs
+
+  // 状态
+  status      String   @default("draft") // draft, active, paused, completed, cancelled, failed
+  currentStep Int      @default(1)       // 当前步骤
+  totalSteps Int                       // 总步骤数
+
+  // 统计
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+  repliedCount Int    @default(0)
+
+  // 时间调度
+  nextSendAt   DateTime?
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  lastActivityAt DateTime?
+
+  // 元数据
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([status, nextSendAt])
+  @@map("sequence_instances")
+}
+
 // ==================== 获客雷达错误日志 ====================
 
 model RadarError {
@@ -1491,7 +1529,7 @@ model RadarError {
   // 错误来源
   adapter     String   // ted, ungm, brave, hunter, etc.
   operation   String   // search, enrich, validate, etc.
-  error       String   @db.String(1000)
+  error       String   // 错误信息
 
   // 关联数据
   candidateId String?
