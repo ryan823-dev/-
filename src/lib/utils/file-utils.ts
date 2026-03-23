@@ -153,12 +153,46 @@ export function getFileCategoryLabel(category: FileCategory, locale: string = "z
 
 // ==================== 文件类别图标 ====================
 
-const CATEGORY_ICONS: Record<FileCategory, LucideIcon> = {
+// 直接导出图标映射表，供组件直接使用
+export const CATEGORY_ICONS: Record<FileCategory, LucideIcon> = {
   video: FileVideo,
   image: FileImage,
   document: FileText,
   audio: FileAudio,
   other: File,
+};
+
+// 扩展名图标映射
+const EXTENSION_ICONS: Record<string, LucideIcon> = {
+  // 表格
+  xls: FileSpreadsheet,
+  xlsx: FileSpreadsheet,
+  csv: FileSpreadsheet,
+  ods: FileSpreadsheet,
+  // 演示文稿
+  ppt: Presentation,
+  pptx: Presentation,
+  odp: Presentation,
+  // 代码
+  js: FileCode,
+  ts: FileCode,
+  jsx: FileCode,
+  tsx: FileCode,
+  html: FileCode,
+  css: FileCode,
+  json: FileCode,
+  xml: FileCode,
+  py: FileCode,
+  java: FileCode,
+  go: FileCode,
+  rs: FileCode,
+  // 压缩包
+  zip: FileArchive,
+  rar: FileArchive,
+  '7z': FileArchive,
+  tar: FileArchive,
+  gz: FileArchive,
+  bz2: FileArchive,
 };
 
 /**
@@ -173,29 +207,7 @@ export function getFileCategoryIcon(category: FileCategory): LucideIcon {
  */
 export function getFileExtensionIcon(extension: string): LucideIcon {
   const ext = extension.toLowerCase().replace(".", "");
-
-  // 表格
-  if (["xls", "xlsx", "csv", "ods"].includes(ext)) {
-    return FileSpreadsheet;
-  }
-
-  // 演示文稿
-  if (["ppt", "pptx", "odp"].includes(ext)) {
-    return Presentation;
-  }
-
-  // 代码
-  if (["js", "ts", "jsx", "tsx", "html", "css", "json", "xml", "py", "java", "go", "rs"].includes(ext)) {
-    return FileCode;
-  }
-
-  // 压缩包
-  if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(ext)) {
-    return FileArchive;
-  }
-
-  // 默认返回文档图标
-  return FileText;
+  return EXTENSION_ICONS[ext] || FileText;
 }
 
 // ==================== 文件类别颜色 ====================

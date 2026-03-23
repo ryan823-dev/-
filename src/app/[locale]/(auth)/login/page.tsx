@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -73,23 +73,16 @@ export default function LoginPage() {
   const { data: session, status } = useSession();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   // Get redirect URL from query params
   const redirectUrl = searchParams.get("redirect");
   const isExternalRedirect = redirectUrl && isValidVertaxRedirect(redirectUrl);
   const targetTenant = redirectUrl ? getTenantSlugFromUrl(redirectUrl) : null;
 
-  // If already logged in and there's a valid redirect, handle it
-  useEffect(() => {
-    if (status === "authenticated" && session?.user && isExternalRedirect) {
-      // User is already logged in, redirect to target with token
-      handleCrossDomainRedirect();
-    }
-  }, [status, session, isExternalRedirect]);
-
-  async function handleCrossDomainRedirect() {
+  // Handle cross-domain redirect - defined with useCallback before useEffect
+  const handleCrossDomainRedirect = useCallback(async () => {
     if (!redirectUrl || !isExternalRedirect) return;
-    
+
     try {
       // Generate cross-platform token via API
       const response = await fetch("/api/auth/cross-platform-token", {
@@ -97,7 +90,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetUrl: redirectUrl }),
       });
-      
+
       if (response.ok) {
         const { token } = await response.json();
         // Redirect with token in query parameter (will be exchanged for cookie on Vertax side)
@@ -111,7 +104,15 @@ export default function LoginPage() {
       // Fallback: redirect without token
       window.location.href = redirectUrl;
     }
-  }
+  }, [redirectUrl, isExternalRedirect]);
+
+  // If already logged in and there's a valid redirect, handle it
+  useEffect(() => {
+    if (status === "authenticated" && session?.user && isExternalRedirect) {
+      // User is already logged in, redirect to target with token
+      handleCrossDomainRedirect();
+    }
+  }, [status, session, isExternalRedirect, handleCrossDomainRedirect]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -140,9 +141,8 @@ export default function LoginPage() {
         // Determine redirect based on current domain
         const hostname = window.location.hostname;
         const isTowerDomain = hostname === "tower.vertax.top" || hostname === "tower.vertax.cn";
-        const isVercelPreview = hostname.includes("vercel.app");
         const isCustomerDomain = hostname.endsWith(".vertax.top") && !isTowerDomain;
-        
+
         // Customer view → /c/home, Operations view (tower or vercel preview) → /dashboard
         const targetPath = isCustomerDomain ? "/zh-CN/c/home" : "/zh-CN/dashboard";
         router.push(targetPath);

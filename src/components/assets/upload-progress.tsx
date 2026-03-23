@@ -2,20 +2,39 @@
 
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import { formatFileSize, getFileCategoryIcon, detectFileCategory, getFileExtension } from "@/lib/utils/file-utils";
+import {
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  FileVideo,
+  FileImage,
+  FileText,
+  FileAudio,
+  File,
+} from "lucide-react";
+import { formatFileSize, detectFileCategory, getFileExtension } from "@/lib/utils/file-utils";
 import { cn } from "@/lib/utils";
-import type { UploadProgress as UploadProgressType } from "@/types/assets";
+import type { UploadProgress as UploadProgressType, FileCategory } from "@/types/assets";
 
 interface UploadProgressProps {
   upload: UploadProgressType;
   onCancel?: () => void;
 }
 
+// 直接定义图标组件映射 - 在组件外部定义，避免渲染期间创建
+const CATEGORY_ICONS_MAP: Record<FileCategory, React.ComponentType<{ className?: string }>> = {
+  video: FileVideo,
+  image: FileImage,
+  document: FileText,
+  audio: FileAudio,
+  other: File,
+};
+
 export function UploadProgress({ upload, onCancel }: UploadProgressProps) {
   const extension = getFileExtension(upload.fileName);
   const fileCategory = detectFileCategory("", extension);
-  const Icon = getFileCategoryIcon(fileCategory);
+  const Icon = CATEGORY_ICONS_MAP[fileCategory];
 
   const statusColors = {
     pending: "text-muted-foreground",
@@ -52,8 +71,8 @@ export function UploadProgress({ upload, onCancel }: UploadProgressProps) {
         </div>
 
         {/* 进度条 */}
-        <Progress 
-          value={upload.progress} 
+        <Progress
+          value={upload.progress}
           className="h-1.5"
           indicatorClassName={progressColors[upload.status]}
         />

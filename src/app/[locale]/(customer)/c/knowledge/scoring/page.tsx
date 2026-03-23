@@ -6,17 +6,18 @@
  * 允许用户自定义获客雷达的评分规则，定义什么样的公司是目标客户
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Info, BookOpen, Zap } from 'lucide-react';
 import { ScoringProfileConfig } from '@/components/knowledge/scoring-profile-config';
 
-export default function ScoringProfilePage() {
-  const [mounted, setMounted] = useState(false);
+// 用于安全地检测客户端渲染
+const emptySubscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+export default function ScoringProfilePage() {
+  const mounted = useSyncExternalStore(emptySubscribe, getSnapshot, getServerSnapshot);
 
   if (!mounted) {
     return null;

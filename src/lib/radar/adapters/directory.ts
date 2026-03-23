@@ -358,6 +358,35 @@ const REGION_COUNTRIES: Record<Region, string[]> = {
 };
 
 /**
+ * 区域映射数组（用于测试和遍历）
+ */
+export const REGION_MAPPINGS: Array<{ region: Region; countries: string[] }> =
+  Object.entries(REGION_COUNTRIES).map(([region, countries]) => ({
+    region: region as Region,
+    countries,
+  }));
+
+/**
+ * 根据国家代码获取所属区域
+ */
+export function getRegionByCountry(countryCode: string): Region | null {
+  const code = countryCode.toUpperCase();
+  for (const [region, countries] of Object.entries(REGION_COUNTRIES)) {
+    if (countries.includes(code)) {
+      return region as Region;
+    }
+  }
+  return null;
+}
+
+/**
+ * 根据关键词获取区域（别名）
+ */
+export function getRegionsByKeyword(keyword: string): Region[] {
+  return inferRegionFromKeyword(keyword);
+}
+
+/**
  * 根据关键词推断区域
  */
 export function inferRegionFromKeyword(keyword: string): Region[] {

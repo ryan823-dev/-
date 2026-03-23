@@ -2,11 +2,18 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Play } from "lucide-react";
 import {
-  getFileCategoryIcon,
-  getFileExtensionIcon,
-} from "@/lib/utils/file-utils";
+  Play,
+  FileVideo,
+  FileImage,
+  FileText,
+  FileAudio,
+  File,
+  FileSpreadsheet,
+  Presentation,
+  FileCode,
+  FileArchive,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FileCategory } from "@/types/assets";
 
@@ -32,9 +39,51 @@ const iconSizes = {
   lg: "h-12 w-12",
 };
 
+// 直接定义图标组件映射 - 在组件外部定义，避免渲染期间创建
+const CATEGORY_ICONS_MAP: Record<FileCategory, React.ComponentType<{ className?: string }>> = {
+  video: FileVideo,
+  image: FileImage,
+  document: FileText,
+  audio: FileAudio,
+  other: File,
+};
+
+// 扩展名图标映射
+const EXTENSION_ICONS_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  // 表格
+  xls: FileSpreadsheet,
+  xlsx: FileSpreadsheet,
+  csv: FileSpreadsheet,
+  ods: FileSpreadsheet,
+  // 演示文稿
+  ppt: Presentation,
+  pptx: Presentation,
+  odp: Presentation,
+  // 代码
+  js: FileCode,
+  ts: FileCode,
+  jsx: FileCode,
+  tsx: FileCode,
+  html: FileCode,
+  css: FileCode,
+  json: FileCode,
+  xml: FileCode,
+  py: FileCode,
+  java: FileCode,
+  go: FileCode,
+  rs: FileCode,
+  // 压缩包
+  zip: FileArchive,
+  rar: FileArchive,
+  "7z": FileArchive,
+  tar: FileArchive,
+  gz: FileArchive,
+  bz2: FileArchive,
+};
+
 export function AssetThumbnail({
   fileCategory,
-  mimeType,
+  mimeType: _mimeType,
   title,
   thumbnailUrl,
   size = "md",
@@ -47,8 +96,8 @@ export function AssetThumbnail({
   const canShowThumbnail =
     thumbnailUrl && (fileCategory === "image" || fileCategory === "video") && !imageError;
 
-  // 获取图标
-  const Icon = getFileCategoryIcon(fileCategory);
+  // 直接从映射表获取图标组件
+  const Icon = CATEGORY_ICONS_MAP[fileCategory];
   const iconSize = iconSizes[size];
 
   if (canShowThumbnail) {
@@ -115,7 +164,8 @@ export function AssetThumbnailPlaceholder({
   size = "md",
   className,
 }: AssetThumbnailPlaceholderProps) {
-  const Icon = getFileExtensionIcon(extension);
+  const ext = extension.toLowerCase().replace(".", "");
+  const Icon = EXTENSION_ICONS_MAP[ext] || FileText;
   const iconSize = iconSizes[size];
 
   return (

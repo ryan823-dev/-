@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     // 发送测试邮件
     const result = await resend.emails.send({
-      from: '涂豆科技 <noreply@tdpaintcell.com>',
+      from: '涂豆科技 <noreply@tdpaint.com>',
       to: to,
       subject: '【VertaX】邮件服务测试成功',
       html: `

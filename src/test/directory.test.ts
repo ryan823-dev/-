@@ -86,7 +86,7 @@ describe('Directory Sources', () => {
 
   describe('REGION_MAPPINGS', () => {
     it('should have all major regions', () => {
-      const regions = REGION_MAPPINGS.map(r => r.region);
+      const regions = REGION_MAPPINGS.map((r: { region: Region }) => r.region);
       expect(regions).toContain('NORTH_AMERICA');
       expect(regions).toContain('MIDDLE_EAST');
       expect(regions).toContain('AFRICA');

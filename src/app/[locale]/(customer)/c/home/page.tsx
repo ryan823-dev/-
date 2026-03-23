@@ -319,7 +319,7 @@ export default function CEOCockpitPage() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-dark font-medium text-sm">{action.title}</p>
-                    <p className="text-dark-muted text-xs mt-0.5 truncate">内容已根据"旧线改造案例"生成，需校实涂料节省数据准确性</p>
+                    <p className="text-dark-muted text-xs mt-0.5 truncate">内容已根据「旧线改造案例」生成，需校实涂料节省数据准确性</p>
                   </div>
                   <Link
                     href={action.actionLink}

@@ -22,7 +22,7 @@ const categoryId = catRes.rows[0].id;
 // Get user
 const userRes = await pool.query(
   `SELECT id FROM "User" WHERE email = $1`,
-  ['admin@tdpaintcell.com']
+  ['admin@tdpaint.com']
 );
 const authorId = userRes.rows[0].id;
 

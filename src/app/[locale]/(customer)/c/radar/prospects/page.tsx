@@ -668,7 +668,7 @@ export default function RadarProspectsPage() {
                         <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center mx-auto mb-4">
                           <Sparkles size={32} className="text-[#D4AF37]" />
                         </div>
-                        <p className="text-slate-300">点击"生成个性化外联方案"开始</p>
+                        <p className="text-slate-300">点击「生成个性化外联方案」开始</p>
                         <p className="text-xs text-slate-500 mt-2">AI 将根据客户画像和你的企业证据库生成定制化外联内容</p>
                         <button
                           onClick={() => handleGenerateOutreach(selectedCompany)}

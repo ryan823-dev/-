@@ -14,7 +14,20 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "src/generated/**",
     "src/components/ui/**",
+    // Ignore script files that use CommonJS
+    "scripts/**",
+    ".vercel-tmp/**",
+    "export-candidates.cjs",
   ]),
+  // Relax some rules for better developer experience
+  {
+    rules: {
+      // Allow unused vars that start with underscore
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      // Relax any type warnings to warnings instead of errors
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, List, Upload, Plus } from "lucide-react";
+import { LayoutGrid, List, Upload } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,8 +54,7 @@ import type {
 type ViewMode = "grid" | "list";
 
 export default function AssetsPage() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [_isPending, startTransition] = useTransition();
 
   // 视图状态
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -135,14 +134,6 @@ export default function AssetsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // 从 localStorage 恢复视图模式
-  useEffect(() => {
-    const saved = localStorage.getItem("asset-view-mode");
-    if (saved === "grid" || saved === "list") {
-      setViewMode(saved);
-    }
-  }, []);
 
   // 保存视图模式
   const handleViewModeChange = (mode: ViewMode) => {

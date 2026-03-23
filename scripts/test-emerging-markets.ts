@@ -1,22 +1,25 @@
 // ==================== 新兴市场适配器测试脚本 ====================
 // 测试新增的新兴市场数据源是否正常工作
 
-import { AdapterRegistry } from '../src/lib/radar/adapters/registry';
+import {
+  ensureAdaptersInitialized,
+  listAdapterRegistrations,
+} from '../src/lib/radar/adapters/registry';
 import type { RadarSearchQuery } from '../src/lib/radar/adapters/types';
 
 async function testEmergingMarkets() {
   console.log('🚀 开始测试新兴市场适配器...\n');
 
   // 初始化适配器注册表
-  const registry = AdapterRegistry.getInstance();
+  ensureAdaptersInitialized();
 
   // 测试 1: 检查适配器是否注册
   console.log('📋 测试 1: 检查适配器注册状态');
-  const adapters = registry.listAdapters();
-  const emergingAdapters = adapters.filter(a => 
+  const adapters = listAdapterRegistrations();
+  const emergingAdapters = adapters.filter(a =>
     a.code === 'emerging_markets' || a.code === 'dev_bank'
   );
-  
+
   console.log('✅ 已注册的新兴市场适配器:');
   emergingAdapters.forEach(a => {
     console.log(`  - ${a.name} (${a.code})`);

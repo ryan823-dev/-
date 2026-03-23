@@ -339,7 +339,7 @@ export default function TenantDetailPage() {
                 onChange={(e) => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                显示在邮件"发件人"字段
+                显示在邮件「发件人」字段
               </p>
             </div>
 

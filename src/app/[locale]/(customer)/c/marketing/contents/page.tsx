@@ -339,7 +339,7 @@ export default function ContentsPage() {
             </div>
             {briefs.length === 0 && (
               <p className="text-xs text-amber-600 mt-3">
-                暂无就绪的内容规划，请先在内容规划中创建并设为"就绪"状态。
+                暂无就绪的内容规划，请先在内容规划中创建并设为「就绪」状态。
               </p>
             )}
           </div>

@@ -166,7 +166,7 @@ async function getAssetCounts(tenantId: string): Promise<AssetCounts> {
   const total = assets.length;
   let processing = 0;
   let parsed = 0;
-  let failed = 0;
+  const failed = 0;
 
   for (const asset of assets) {
     // 有 chunks 的视为已解析

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { mapRoleToAppRole, canPerformAction } from '@/lib/permissions';
 import { APP_ROLES, DISPLAY_MODES, type AppRole, type DisplayMode } from '@/lib/constants';
@@ -30,29 +30,35 @@ const RoleContext = createContext<RoleContextValue | null>(null);
 
 const STORAGE_KEY_PREFIX = 'vertax_display_mode';
 
+// 辅助函数：从 localStorage 获取初始显示模式
+function getStoredDisplayMode(userId: string | undefined, defaultMode: DisplayMode): DisplayMode {
+  if (typeof window === 'undefined' || !userId) return defaultMode;
+  const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}_${userId}`);
+  if (stored === DISPLAY_MODES.SECRETARY || stored === DISPLAY_MODES.ANALYST) {
+    return stored;
+  }
+  return defaultMode;
+}
+
+// 用于检测客户端渲染
+const emptySubscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function RoleProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
-  
+  const hydrated = useSyncExternalStore(emptySubscribe, getSnapshot, getServerSnapshot);
+
   const roleName = (session?.user as Record<string, unknown> | undefined)?.roleName as string | undefined;
   const appRole = mapRoleToAppRole(roleName);
   const isDeciderRole = appRole === APP_ROLES.DECIDER;
 
   const defaultMode = isDeciderRole ? DISPLAY_MODES.SECRETARY : DISPLAY_MODES.ANALYST;
-  const [displayMode, setDisplayModeState] = useState<DisplayMode>(defaultMode);
-  const [hydrated, setHydrated] = useState(false);
 
-  // 从 localStorage 恢复用户偏好
-  useEffect(() => {
-    const userId = session?.user?.id;
-    if (!userId) return;
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}_${userId}`);
-    if (stored === DISPLAY_MODES.SECRETARY || stored === DISPLAY_MODES.ANALYST) {
-      setDisplayModeState(stored);
-    } else {
-      setDisplayModeState(defaultMode);
-    }
-    setHydrated(true);
-  }, [session?.user?.id, defaultMode]);
+  // 使用函数初始化，避免在渲染期间调用 setState
+  const [displayMode, setDisplayModeState] = useState<DisplayMode>(() =>
+    getStoredDisplayMode(session?.user?.id, defaultMode)
+  );
 
   const setDisplayMode = useCallback((mode: DisplayMode) => {
     setDisplayModeState(mode);

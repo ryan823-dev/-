@@ -126,8 +126,8 @@ model User {
   name          String?
   image         String?
   password      String?
-  tenantId      String 
-  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  tenant        Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   roleId        String
   role          Role      @relation(fields: [roleId], references: [id])
   locale        String    @default("zh-CN")

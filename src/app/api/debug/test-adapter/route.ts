@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     // 如果 save=true，尝试写入数据库
     let savedCount = 0;
-    let saveErrors: string[] = [];
+    const saveErrors: string[] = [];
     
     if (save && result.items.length > 0) {
       const tenantId = 'cmmanspb30000anfp2ldflrov'; // 涂豆科技

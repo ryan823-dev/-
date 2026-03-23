@@ -69,7 +69,7 @@ export async function runIncrementalScan(
     if (!source) throw new Error(`Source not found: ${sourceId}`);
 
     // 2. 读取或初始化游标
-    let cursorRecord = await prisma.radarScanCursor.findUnique({
+    const cursorRecord = await prisma.radarScanCursor.findUnique({
       where: { profileId_sourceId: { profileId, sourceId } },
     });
 

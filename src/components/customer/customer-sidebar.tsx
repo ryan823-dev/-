@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -37,42 +37,47 @@ interface CustomerSidebarProps {
 
 const STORAGE_KEY = 'vertax-nav-expanded';
 
+// 初始化展开状态的辅助函数
+function getInitialExpandedNav(pathname: string | null): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) return stored;
+
+  // 自动展开当前路由所属的一级
+  const itemsByGroup = getNavItemsByGroup();
+  for (const groupKey of Object.keys(itemsByGroup) as NavGroupKey[]) {
+    const items = itemsByGroup[groupKey];
+    for (const item of items) {
+      if (pathname?.startsWith(item.href)) {
+        return item.key;
+      }
+    }
+  }
+  return null;
+}
+
 // ============================================
 // 主组件
 // ============================================
 
-export function CustomerSidebar({ 
-  tenantName = '客户企业', 
+export function CustomerSidebar({
+  tenantName = '客户企业',
   tenantSlug = 'tenant',
   badgeData = {},
   healthData = {},
 }: CustomerSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedNav, setExpandedNav] = useState<string | null>(null);
   const pathname = usePathname();
 
   // 获取配置数据
   const groups = getSortedGroups();
   const itemsByGroup = getNavItemsByGroup();
 
-  // 初始化展开状态：读取 localStorage 或根据当前路由自动展开
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setExpandedNav(stored);
-    } else {
-      // 自动展开当前路由所属的一级
-      for (const groupKey of Object.keys(itemsByGroup) as NavGroupKey[]) {
-        const items = itemsByGroup[groupKey];
-        for (const item of items) {
-          if (pathname?.startsWith(item.href)) {
-            setExpandedNav(item.key);
-            break;
-          }
-        }
-      }
-    }
-  }, [pathname, itemsByGroup]);
+  // 使用函数初始化状态，避免在 useEffect 中调用 setState
+  const [expandedNav, setExpandedNav] = useState<string | null>(() =>
+    getInitialExpandedNav(pathname)
+  );
 
   // 保存展开状态到 localStorage
   const toggleExpand = (key: string) => {
