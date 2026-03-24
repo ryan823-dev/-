@@ -15,6 +15,7 @@ const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 // Tower domains (operations view)
 const TOWER_DOMAINS = ["tower.vertax.top", "tower.vertax.cn"];
+const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "vertax.top";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -44,6 +45,16 @@ export default auth((req) => {
 
   // Redirect root based on view mode
   if (pathname === "/" || pathname === "/zh-CN" || pathname === "/en") {
+    // Check if accessing root domain (vertax.top) vs subdomain
+    const hostParts = hostname.split(".");
+    const isRootDomain = hostParts.length <= 2 || hostname === BASE_DOMAIN;
+    
+    // Root domain shows landing page, no redirect
+    if (isRootDomain) {
+      return NextResponse.next();
+    }
+    
+    // Subdomain: redirect based on view mode
     if (isDemoMode || req.auth) {
       // Customer view → customer home, Operations view → dashboard
       const targetPath = isCustomerView ? "/zh-CN/c/home" : "/zh-CN/dashboard";
