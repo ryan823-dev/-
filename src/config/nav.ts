@@ -1,11 +1,11 @@
 /**
- * VertaX 客户端导航配�?
+ * VertaX 客户端导航配置
  * 
- * 统一管理所有导航文案、顺序、徽章配�?
- * sidebar �?page header 共享此配�?
+ * 统一管理所有导航文案、顺序、徽章配置
+ * sidebar 与 page header 共享此配置
  * 
- * 设计原则�?
- * - 老板视角：战�?�?获客 �?交付
+ * 设计原则：
+ * - 老板视角：战略 → 获客 → 交付
  * - 一眼懂、尊贵稳重、少术语
  */
 
@@ -51,7 +51,7 @@ export interface NavBadgeConfig {
   type: BadgeType;
   /** 数据来源字段（用于动态获取） */
   source?: string;
-  /** 静态文本（�?增�?�?*/
+  /** 静态文本（如"增值"） */
   text?: string;
 }
 
@@ -67,28 +67,28 @@ export interface SubNavItem {
   order: number;
   /** 徽章配置 */
   badge?: NavBadgeConfig;
-  /** 是否隐藏（条件隐藏用�?*/
+  /** 是否隐藏（条件隐藏用） */
   hidden?: boolean;
 }
 
 export interface NavItem {
-  /** 唯一标识（不可改�?*/
+  /** 唯一标识（不可改） */
   key: NavItemKey;
   /** 侧边栏显示名 */
   label: string;
   /** 页面 H1 大标题（老板语） */
   pageTitle: string;
-  /** 页面 H1 小字副标�?*/
+  /** 页面 H1 小字副标题 */
   pageSubtitle: string;
   /** 路由路径 */
   href: string;
   /** 图标 */
   icon: LucideIcon;
-  /** 显示顺序（按老板动线排序�?*/
+  /** 显示顺序（按老板动线排序） */
   order: number;
-  /** 所属分�?*/
+  /** 所属分组 */
   group: NavGroupKey;
-  /** 健康状态指�?*/
+  /** 健康状态指示 */
   healthSource?: string;
   /** 徽章配置 */
   badge?: NavBadgeConfig;
@@ -115,12 +115,12 @@ export const navGroups: NavGroup[] = [
 ];
 
 // ============================================
-// 导航配置（按老板动线排序�?
+// 导航配置（按老板动线排序）
 // ============================================
 
 export const navConfig: NavItem[] = [
   // ────────────────────────────────────────
-  // 1. 决策中心 - 首页主入�?
+  // 1. 决策中心 - 首页主入口
   // ────────────────────────────────────────
   {
     key: 'strategic-home',
@@ -134,7 +134,7 @@ export const navConfig: NavItem[] = [
   },
 
   // ────────────────────────────────────────
-  // 2. 获客雷达 - 主动找商�?线索
+  // 2. 获客雷达 - 主动找商机/线索
   // ────────────────────────────────────────
   {
     key: 'radar',
@@ -147,7 +147,7 @@ export const navConfig: NavItem[] = [
     group: 'core',
     healthSource: 'radar.status',
     subItems: [
-      { key: 'candidates', label: '线索�?, href: '/customer/radar/candidates', icon: Users, order: 1 },
+      { key: 'candidates', label: '线索池', href: '/customer/radar/candidates', icon: Users, order: 1 },
       { key: 'tasks', label: '扫描任务', href: '/customer/radar/tasks', icon: Zap, order: 2 },
       { key: 'profiles', label: '扫描计划', href: '/customer/radar/profiles', icon: CalendarClock, order: 3 },
       { key: 'channels', label: '渠道地图', href: '/customer/radar/channels', icon: Map, order: 4 },
@@ -171,8 +171,8 @@ export const navConfig: NavItem[] = [
     subItems: [
       { key: 'topics', label: '主题集群', href: '/customer/marketing/topics', icon: Layers, order: 1 },
       { key: 'strategy', label: '内容策略', href: '/customer/marketing/strategy', icon: Zap, order: 2 },
-      { key: 'briefs', label: '内容简�?, href: '/customer/marketing/briefs', icon: FileEdit, order: 3 },
-      { key: 'contents', label: '内容�?, href: '/customer/marketing/contents', icon: FileStack, order: 4 },
+      { key: 'briefs', label: '内容简报', href: '/customer/marketing/briefs', icon: FileEdit, order: 3 },
+      { key: 'contents', label: '内容库', href: '/customer/marketing/contents', icon: FileStack, order: 4 },
     ],
   },
 
@@ -197,7 +197,7 @@ export const navConfig: NavItem[] = [
   {
     key: 'hub',
     label: '协作审批',
-    pageTitle: '交付推进�?,
+    pageTitle: '交付推进台',
     pageSubtitle: '推进中台',
     href: '/customer/hub',
     icon: ClipboardCheck,
@@ -220,8 +220,8 @@ export const navConfig: NavItem[] = [
     group: 'channel',
     healthSource: 'knowledge.status',
     subItems: [
-      { key: 'assets', label: '资料�?, href: '/customer/knowledge/assets', icon: FileStack, order: 1 },
-      { key: 'evidence', label: '证据�?, href: '/customer/knowledge/evidence', icon: ShieldCheck, order: 2 },
+      { key: 'assets', label: '资料库', href: '/customer/knowledge/assets', icon: FileStack, order: 1 },
+      { key: 'evidence', label: '证据库', href: '/customer/knowledge/evidence', icon: ShieldCheck, order: 2 },
       { key: 'company', label: '企业档案', href: '/customer/knowledge/company', icon: Building2, order: 3 },
       { key: 'guidelines', label: '品牌手册', href: '/customer/knowledge/guidelines', icon: BookOpen, order: 4 },
       { key: 'profiles', label: '买家画像', href: '/customer/knowledge/profiles', icon: Users2, order: 5 },
@@ -268,7 +268,7 @@ export function getNavItemsByGroup(): Record<NavGroupKey, NavItem[]> {
 }
 
 /**
- * 根据路由路径获取导航�?
+ * 根据路由路径获取导航项
  */
 export function getNavItemByPath(pathname: string): NavItem | undefined {
   return navConfig.find(item => {
@@ -294,14 +294,14 @@ export function getPageTitleByPath(pathname: string): { title: string; subtitle:
 }
 
 /**
- * 根据 key 获取导航�?
+ * 根据 key 获取导航项
  */
 export function getNavItemByKey(key: NavItemKey): NavItem | undefined {
   return navConfig.find(item => item.key === key);
 }
 
 /**
- * 获取子导航项（已排序�?
+ * 获取子导航项（已排序）
  */
 export function getSortedSubItems(navItem: NavItem): SubNavItem[] {
   if (!navItem.subItems) return [];
@@ -311,7 +311,7 @@ export function getSortedSubItems(navItem: NavItem): SubNavItem[] {
 }
 
 // ============================================
-// 健康状态映�?
+// 健康状态映射
 // ============================================
 
 export type HealthIndicator = 'emerald' | 'amber' | 'red';
