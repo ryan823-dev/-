@@ -1,0 +1,512 @@
+[
+  {
+    "level": 1,
+    "name": "Safety",
+    "slug": "safety"
+  },
+  {
+    "level": 2,
+    "name": "Head Protection",
+    "slug": "head-protection"
+  },
+  {
+    "level": 3,
+    "name": "Bump Caps",
+    "slug": "bump-caps"
+  },
+  {
+    "level": 1,
+    "name": "Adhesives, Sealants and Tape",
+    "slug": "adhesives-sealants-and-tape"
+  },
+  {
+    "level": 2,
+    "name": "Tape",
+    "slug": "tape"
+  },
+  {
+    "level": 3,
+    "name": "Surface Protection Tape",
+    "slug": "surface-protection-tape"
+  },
+  {
+    "level": 2,
+    "name": "Hearing Protection",
+    "slug": "hearing-protection"
+  },
+  {
+    "level": 3,
+    "name": "Earmuffs",
+    "slug": "earmuffs"
+  },
+  {
+    "level": 2,
+    "name": "Hand & Arm Protection",
+    "slug": "hand-arm-protection"
+  },
+  {
+    "level": 3,
+    "name": "Safety Gloves",
+    "slug": "safety-gloves"
+  },
+  {
+    "level": 1,
+    "name": "Power Transmission",
+    "slug": "power-transmission"
+  },
+  {
+    "level": 2,
+    "name": "Bearings",
+    "slug": "bearings"
+  },
+  {
+    "level": 3,
+    "name": "Plain Bearings",
+    "slug": "plain-bearings"
+  },
+  {
+    "level": 1,
+    "name": "Material Handling",
+    "slug": "material-handling"
+  },
+  {
+    "level": 2,
+    "name": "Ladders, Platforms & Personnel Lifts",
+    "slug": "ladders-platforms-personnel-lifts"
+  },
+  {
+    "level": 3,
+    "name": "Step Stools",
+    "slug": "step-stools"
+  },
+  {
+    "level": 3,
+    "name": "Work Platforms",
+    "slug": "work-platforms"
+  },
+  {
+    "level": 2,
+    "name": "Dock & Loading Equipment",
+    "slug": "dock-loading-equipment"
+  },
+  {
+    "level": 3,
+    "name": "Dock Bumpers",
+    "slug": "dock-bumpers"
+  },
+  {
+    "level": 2,
+    "name": "Casters & Wheels",
+    "slug": "casters-wheels"
+  },
+  {
+    "level": 3,
+    "name": "Track Wheels",
+    "slug": "track-wheels"
+  },
+  {
+    "level": 3,
+    "name": "Stem Casters",
+    "slug": "stem-casters"
+  },
+  {
+    "level": 2,
+    "name": "Lifting, Pulling & Positioning",
+    "slug": "lifting-pulling-positioning"
+  },
+  {
+    "level": 3,
+    "name": "Lifting Slings",
+    "slug": "lifting-slings"
+  },
+  {
+    "level": 3,
+    "name": "Lifting Magnets",
+    "slug": "lifting-magnets"
+  },
+  {
+    "level": 3,
+    "name": "Protective Sleeves",
+    "slug": "protective-sleeves"
+  },
+  {
+    "level": 2,
+    "name": "Footwear & Footwear Accessories",
+    "slug": "footwear-footwear-accessories"
+  },
+  {
+    "level": 3,
+    "name": "Traction Devices",
+    "slug": "traction-devices"
+  },
+  {
+    "level": 2,
+    "name": "Protective Clothing",
+    "slug": "protective-clothing"
+  },
+  {
+    "level": 3,
+    "name": "Welding Protective Clothing",
+    "slug": "welding-protective-clothing"
+  },
+  {
+    "level": 2,
+    "name": "Workwear",
+    "slug": "workwear"
+  },
+  {
+    "level": 3,
+    "name": "Rainwear",
+    "slug": "rainwear"
+  },
+  {
+    "level": 2,
+    "name": "First Aid & Wound Care",
+    "slug": "first-aid-wound-care"
+  },
+  {
+    "level": 3,
+    "name": "Medicine Vending Machines",
+    "slug": "medicine-vending-machines"
+  },
+  {
+    "level": 2,
+    "name": "Fire Protection",
+    "slug": "fire-protection"
+  },
+  {
+    "level": 3,
+    "name": "Fire Blankets",
+    "slug": "fire-blankets"
+  },
+  {
+    "level": 2,
+    "name": "Signs & Facility Identification Products",
+    "slug": "signs-facility-identification-products"
+  },
+  {
+    "level": 3,
+    "name": "Stamping Tools",
+    "slug": "stamping-tools"
+  },
+  {
+    "level": 1,
+    "name": "Packaging & Shipping",
+    "slug": "packaging-shipping"
+  },
+  {
+    "level": 2,
+    "name": "Packing Tape",
+    "slug": "packing-tape"
+  },
+  {
+    "level": 3,
+    "name": "Label Protection Tape",
+    "slug": "label-protection-tape"
+  },
+  {
+    "level": 2,
+    "name": "Protective Packaging",
+    "slug": "protective-packaging"
+  },
+  {
+    "level": 3,
+    "name": "Instant Foam",
+    "slug": "instant-foam"
+  },
+  {
+    "level": 1,
+    "name": "Cleaning and Janitorial",
+    "slug": "cleaning-and-janitorial"
+  },
+  {
+    "level": 2,
+    "name": "Cleaning Supplies",
+    "slug": "cleaning-supplies"
+  },
+  {
+    "level": 3,
+    "name": "Cleaning Buckets",
+    "slug": "cleaning-buckets"
+  },
+  {
+    "level": 3,
+    "name": "Cleaning Carts",
+    "slug": "cleaning-carts"
+  },
+  {
+    "level": 1,
+    "name": "Lighting",
+    "slug": "lighting"
+  },
+  {
+    "level": 2,
+    "name": "Lighting Fixtures & Retrofit Kits",
+    "slug": "lighting-fixtures-retrofit-kits"
+  },
+  {
+    "level": 3,
+    "name": "Track Light Fixtures",
+    "slug": "track-light-fixtures"
+  },
+  {
+    "level": 2,
+    "name": "Adhesives & Glues",
+    "slug": "adhesives-glues"
+  },
+  {
+    "level": 3,
+    "name": "Contact Adhesives",
+    "slug": "contact-adhesives"
+  },
+  {
+    "level": 1,
+    "name": "Hardware",
+    "slug": "hardware"
+  },
+  {
+    "level": 2,
+    "name": "Flooring Hardware",
+    "slug": "flooring-hardware"
+  },
+  {
+    "level": 3,
+    "name": "Construction Adhesives",
+    "slug": "construction-adhesives"
+  },
+  {
+    "level": 2,
+    "name": "Caulks, Sealants & Gasket Makers",
+    "slug": "caulks-sealants-gasket-makers"
+  },
+  {
+    "level": 3,
+    "name": "Caulks & Sealants",
+    "slug": "caulks-sealants"
+  },
+  {
+    "level": 3,
+    "name": "Spray Adhesives",
+    "slug": "spray-adhesives"
+  },
+  {
+    "level": 2,
+    "name": "Adhesive & Sealant Surface Preparation",
+    "slug": "adhesive-sealant-surface-preparation"
+  },
+  {
+    "level": 3,
+    "name": "Instant Adhesives",
+    "slug": "instant-adhesives"
+  },
+  {
+    "level": 3,
+    "name": "Hot Melt Adhesives",
+    "slug": "hot-melt-adhesives"
+  },
+  {
+    "level": 3,
+    "name": "Wood Glues",
+    "slug": "wood-glues"
+  },
+  {
+    "level": 3,
+    "name": "Pipe Sealants",
+    "slug": "pipe-sealants"
+  },
+  {
+    "level": 2,
+    "name": "Fall Protection",
+    "slug": "fall-protection"
+  },
+  {
+    "level": 3,
+    "name": "Fall Protection Kits",
+    "slug": "fall-protection-kits"
+  },
+  {
+    "level": 2,
+    "name": "Respiratory Protection",
+    "slug": "respiratory-protection"
+  },
+  {
+    "level": 3,
+    "name": "Respirator Fit Testing",
+    "slug": "respirator-fit-testing"
+  },
+  {
+    "level": 2,
+    "name": "Stretch Wrap",
+    "slug": "stretch-wrap"
+  },
+  {
+    "level": 3,
+    "name": "Stretch Wrap Rolls",
+    "slug": "stretch-wrap-rolls"
+  },
+  {
+    "level": 2,
+    "name": "Packing & Shipping Bags",
+    "slug": "packing-shipping-bags"
+  },
+  {
+    "level": 3,
+    "name": "Bulk Bags",
+    "slug": "bulk-bags"
+  },
+  {
+    "level": 2,
+    "name": "Outdoor Lighting",
+    "slug": "outdoor-lighting"
+  },
+  {
+    "level": 3,
+    "name": "Floodlights",
+    "slug": "floodlights"
+  },
+  {
+    "level": 2,
+    "name": "Lockout Tagout",
+    "slug": "lockout-tagout"
+  },
+  {
+    "level": 3,
+    "name": "Lockout Padlocks",
+    "slug": "lockout-padlocks"
+  },
+  {
+    "level": 3,
+    "name": "Electrical Lockout Devices",
+    "slug": "electrical-lockout-devices"
+  },
+  {
+    "level": 3,
+    "name": "Lockout Hasps",
+    "slug": "lockout-hasps"
+  },
+  {
+    "level": 1,
+    "name": "HVAC and Refrigeration",
+    "slug": "hvac-and-refrigeration"
+  },
+  {
+    "level": 2,
+    "name": "Air Filters",
+    "slug": "air-filters"
+  },
+  {
+    "level": 3,
+    "name": "Bag Air Filters",
+    "slug": "bag-air-filters"
+  },
+  {
+    "level": 2,
+    "name": "Floor Mats",
+    "slug": "floor-mats"
+  },
+  {
+    "level": 3,
+    "name": "Floor Protection Mats",
+    "slug": "floor-protection-mats"
+  },
+  {
+    "level": 3,
+    "name": "Entrance Mats",
+    "slug": "entrance-mats"
+  },
+  {
+    "level": 1,
+    "name": "Electrical",
+    "slug": "electrical"
+  },
+  {
+    "level": 2,
+    "name": "Wire & Cable Management",
+    "slug": "wire-cable-management"
+  },
+  {
+    "level": 3,
+    "name": "Wireways",
+    "slug": "wireways"
+  },
+  {
+    "level": 1,
+    "name": "Tools",
+    "slug": "tools"
+  },
+  {
+    "level": 2,
+    "name": "Tool Storage",
+    "slug": "tool-storage"
+  },
+  {
+    "level": 3,
+    "name": "Tool Organizers",
+    "slug": "tool-organizers"
+  },
+  {
+    "level": 3,
+    "name": "Modular Tool Storage Systems",
+    "slug": "modular-tool-storage-systems"
+  },
+  {
+    "level": 1,
+    "name": "Lab Supplies",
+    "slug": "lab-supplies"
+  },
+  {
+    "level": 2,
+    "name": "Lab Furniture & Accessories",
+    "slug": "lab-furniture-accessories"
+  },
+  {
+    "level": 3,
+    "name": "Lab Tables",
+    "slug": "lab-tables"
+  },
+  {
+    "level": 1,
+    "name": "Plumbing",
+    "slug": "plumbing"
+  },
+  {
+    "level": 2,
+    "name": "Plumbing Valves",
+    "slug": "plumbing-valves"
+  },
+  {
+    "level": 3,
+    "name": "Solenoid Valves",
+    "slug": "solenoid-valves"
+  },
+  {
+    "level": 1,
+    "name": "Pipe, Hose, Tube & Fittings",
+    "slug": "pipe-hose-tube-fittings"
+  },
+  {
+    "level": 2,
+    "name": "Hose, Hose Fittings & Hose Reels",
+    "slug": "hose-hose-fittings-hose-reels"
+  },
+  {
+    "level": 3,
+    "name": "Hose Reels",
+    "slug": "hose-reels"
+  },
+  {
+    "level": 2,
+    "name": "Strapping",
+    "slug": "strapping"
+  },
+  {
+    "level": 3,
+    "name": "Strapping Bands",
+    "slug": "strapping-bands"
+  },
+  {
+    "level": 3,
+    "name": "Quiet Packing Tape",
+    "slug": "quiet-packing-tape"
+  }
+]
