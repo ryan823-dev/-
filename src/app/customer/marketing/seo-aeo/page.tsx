@@ -36,6 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { SkillTrigger } from "@/components/skills";
+import { SKILL_NAMES } from "@/lib/skills/registry";
 
 // ============================================
 // Score Ring
@@ -126,7 +128,7 @@ function CheckRow({ check }: { check: SeoCheck }) {
 // Content Card
 // ============================================
 
-function ContentCard({ item }: { item: SeoAeoItem }) {
+function ContentCard({ item, onRefresh }: { item: SeoAeoItem; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
 
   const scoreColor =
@@ -313,20 +315,60 @@ function ContentCard({ item }: { item: SeoAeoItem }) {
                 ))}
               </div>
 
-              {/* Quick action */}
-              <Link
-                href={`/customer/marketing/contents/${item.id}`}
-                className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium transition-all hover:opacity-90"
-                style={{
-                  background: "rgba(212,175,55,0.1)",
-                  border: "1px solid rgba(212,175,55,0.25)",
-                  color: "#D4AF37",
-                }}
-              >
-                <FileText size={12} />
-                前往编辑内容
-                <ChevronRight size={11} />
-              </Link>
+              {/* AI Quick Actions */}
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <SkillTrigger
+                    skillName={SKILL_NAMES.MARKETING_FIX_SEO_ISSUES}
+                    displayName="AI 修复 SEO"
+                    description="自动修复标题、meta description、slug 等 SEO 缺陷"
+                    entityType="SeoContent"
+                    entityId={item.id}
+                    input={{
+                      contentId: item.id,
+                      title: item.title,
+                      slug: item.slug,
+                      metaDescription: item.metaDescription ?? undefined,
+                      seoHealthScore: item.seoHealthScore,
+                      issues: item.checks.filter((c) => !c.passed).map((c) => ({ type: c.key, message: c.detail })),
+                      targetKeywords: item.keywords,
+                    }}
+                    useCompanyProfile={true}
+                    onSuccess={() => { onRefresh(); }}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-[11px] border-[rgba(239,68,68,0.4)] text-red-400 hover:bg-red-500/10"
+                  />
+                  <SkillTrigger
+                    skillName={SKILL_NAMES.MARKETING_OPTIMIZE_GEO}
+                    displayName="AI 优化 GEO"
+                    description="生成适合 AI 引擎引用的 GEO 版本与 FAQ 结构化数据"
+                    entityType="SeoContent"
+                    entityId={item.id}
+                    input={{
+                      contentId: item.id,
+                      title: item.title,
+                      bodyHtml: item.content.slice(0, 5000),
+                      targetKeywords: item.keywords,
+                      currentAeoScore: item.aeoScore,
+                    }}
+                    useCompanyProfile={true}
+                    onSuccess={() => { onRefresh(); }}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-[11px] border-[rgba(212,175,55,0.4)] text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  />
+                </div>
+                <Link
+                  href={`/customer/marketing/contents/${item.id}`}
+                  className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-[11px] font-medium transition-all hover:opacity-90"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#64748b" }}
+                >
+                  <FileText size={11} />
+                  前往编辑内容
+                  <ChevronRight size={10} />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -628,7 +670,7 @@ export default function SeoAeoPage() {
               <span className="ml-auto flex items-center gap-1 text-slate-600">点击行展开检查详情</span>
             </div>
             {filtered.map((item) => (
-              <ContentCard key={item.id} item={item} />
+              <ContentCard key={item.id} item={item} onRefresh={loadData} />
             ))}
           </div>
         )}

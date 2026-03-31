@@ -8,6 +8,7 @@
     { "path": "/api/cron/radar-cleanup", "schedule": "0 2 * * *" },
     { "path": "/api/cron/radar-notify", "schedule": "0 8 * * *" },
     { "path": "/api/cron/push-timeout", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/publish-scheduled", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/publish-scheduled", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/geo-citation-check", "schedule": "0 9 * * *" }
   ]
 }

@@ -64,6 +64,8 @@ export const SKILL_NAMES = {
   MARKETING_GENERATE_CONTENT_DRAFT: 'marketing.generateContentDraft',
   MARKETING_VERIFY_CLAIMS: 'marketing.verifyClaims',
   MARKETING_BUILD_PUBLISH_PACK: 'marketing.buildPublishPack',
+  MARKETING_FIX_SEO_ISSUES: 'marketing.fixSeoIssues',
+  MARKETING_OPTIMIZE_GEO: 'marketing.optimizeGeo',
 } as const;
 
 export type SkillName = typeof SKILL_NAMES[keyof typeof SKILL_NAMES];

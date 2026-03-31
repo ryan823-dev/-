@@ -957,6 +957,12 @@ export default function RadarCandidatesPage() {
                   )}
                 </div>
 
+                {/* 内容联动面板 */}
+                <RadarContentMatchPanel
+                  candidateId={selectedCandidate.id}
+                  candidateName={selectedCandidate.displayName}
+                />
+
                 {/* 邮件序列模块 */}
                 {researchData && (
                   <div className="bg-[#F7F3E8] rounded-2xl border border-[#E8E0D0] p-5">
@@ -1192,4 +1198,5 @@ export default function RadarCandidatesPage() {
       </div>
     </div>
   );
+}
 }

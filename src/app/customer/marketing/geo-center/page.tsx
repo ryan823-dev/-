@@ -15,11 +15,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getGeoContents, type GeoContentItem } from "@/actions/geo-center";
+import { getDistributionStats, type GeoDistributionStats } from "@/actions/geo-distribution";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { SkillTrigger } from "@/components/skills";
+import { SKILL_NAMES } from "@/lib/skills/registry";
+import { GeoDistributionPanel } from "@/components/marketing/geo-distribution-panel";
 
-function GeoCard({ item }: { item: GeoContentItem }) {
+function GeoCard({ item, onRefresh }: { item: GeoContentItem; onRefresh: () => void }) {
   const [copied, setCopied] = useState(false);
   const geo = item.geoVersion as string;
   const meta = item.aiMetadata;
@@ -145,17 +149,42 @@ function GeoCard({ item }: { item: GeoContentItem }) {
           <span className="text-[10px] text-slate-600">
             {geoWordCount} words · 可粘贴至 About / FAQ / Landing Page
           </span>
-          <Link href={`/customer/marketing/contents/${item.id}`}>
-            <Button
+          <div className="flex items-center gap-2">
+            <SkillTrigger
+              skillName={SKILL_NAMES.MARKETING_OPTIMIZE_GEO}
+              displayName="AI 重新优化"
+              description="重新生成更适合 AI 引擎引用的 GEO 版本与 FAQ"
+              entityType="SeoContent"
+              entityId={item.id}
+              input={{
+                contentId: item.id,
+                title: item.title,
+                bodyHtml: geo,
+                targetKeywords: item.keywords,
+              }}
+              useCompanyProfile={true}
+              onSuccess={() => { onRefresh(); }}
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-[10px] text-slate-500 hover:text-[#D4AF37]"
-            >
-              查看完整内容{" "}
-              <ChevronRight className="w-3 h-3 ml-1" />
-            </Button>
-          </Link>
+              className="h-6 px-2 text-[10px] text-[#D4AF37] hover:bg-[rgba(212,175,55,0.1)]"
+            />
+            <Link href={`/customer/marketing/contents/${item.id}`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] text-slate-500 hover:text-[#D4AF37]"
+              >
+                查看完整内容{" "}
+                <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
         </div>
+      </div>
+
+      {/* Distribution Tracking */}
+      <div className="px-5 pb-5">
+        <GeoDistributionPanel contentId={item.id} keywords={item.keywords} />
       </div>
     </div>
   );
@@ -164,13 +193,18 @@ function GeoCard({ item }: { item: GeoContentItem }) {
 export default function GeoCenterPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<GeoContentItem[]>([]);
+  const [distStats, setDistStats] = useState<GeoDistributionStats | null>(null);
   const [search, setSearch] = useState("");
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getGeoContents();
+      const [data, stats] = await Promise.all([
+        getGeoContents(),
+        getDistributionStats(),
+      ]);
       setItems(data);
+      setDistStats(stats);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -263,11 +297,12 @@ export default function GeoCenterPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mt-6 relative">
+          <div className="grid grid-cols-4 gap-4 mt-6 relative">
             {[
               { label: "GEO 版本总数", value: items.length, color: "text-[#D4AF37]" },
               { label: "平均 GEO 字数", value: avgGeoWords, color: "text-slate-300" },
-              { label: "AI 引擎可引用", value: items.length, color: "text-emerald-400" },
+              { label: "AI 引擎已引用", value: distStats?.cited ?? 0, color: "text-emerald-400" },
+              { label: "分发渠道注册", value: distStats?.totalRecords ?? 0, color: "text-blue-400" },
             ].map((s) => (
               <div
                 key={s.label}
@@ -361,7 +396,7 @@ export default function GeoCenterPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
             {filtered.map((item) => (
-              <GeoCard key={item.id} item={item} />
+              <GeoCard key={item.id} item={item} onRefresh={loadData} />
             ))}
           </div>
         )}

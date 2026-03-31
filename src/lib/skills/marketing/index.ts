@@ -5,3 +5,4 @@ export { contentBriefSkill } from './content-brief';
 export { contentDraftSkill } from './content-draft';
 export { verifyClaimsSkill } from './verify-claims';
 export { publishPackSkill } from './publish-pack';
+export { fixSeoIssuesSkill, optimizeGeoSkill } from './seo-ops';

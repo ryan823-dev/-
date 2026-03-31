@@ -48,7 +48,8 @@ import {
   getWebsiteConfig,
 } from '@/actions/publishing';
 import type { PushRecordData, WebsiteConfigData } from '@/actions/publishing.types';
-import { SkillPanel } from '@/components/skills';
+import { SkillPanel, SkillTrigger } from '@/components/skills';
+import { SKILL_NAMES } from '@/lib/skills/registry';
 
 type ViewMode = 'list' | 'create' | 'detail';
 
@@ -903,11 +904,38 @@ export default function MarketingPage() {
                 </div>
               </>
             ) : (
-              <div className="rounded-2xl p-8 text-center" style={{ background: 'linear-gradient(135deg, #0B1220 0%, #0A1018 60%, #0D1525 100%)', boxShadow: '0 8px 32px -8px rgba(0,0,0,0.45)' }}>
-                <div className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)' }}>
-                  <Eye size={28} className="text-[#D4AF37]" />
+              <div className="space-y-4">
+                <div className="rounded-2xl p-8 text-center" style={{ background: 'linear-gradient(135deg, #0B1220 0%, #0A1018 60%, #0D1525 100%)', boxShadow: '0 8px 32px -8px rgba(0,0,0,0.45)' }}>
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                    <Eye size={28} className="text-[#D4AF37]" />
+                  </div>
+                  <p className="text-sm text-slate-400">选择内容查看详情</p>
                 </div>
-                <p className="text-sm text-slate-400">选择内容查看详情</p>
+                {/* Quick verify — run on the most recent unpublished content */}
+                {contents.filter((c) => c.status !== 'published').slice(0, 1).map((c) => (
+                  <div key={c.id} className="rounded-2xl border border-[#E8E0D0] p-5 bg-[#F7F3E8]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles size={14} className="text-[#D4AF37]" />
+                      <span className="text-sm font-semibold text-[#0B1B2B]">快速证据校验</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3 line-clamp-2">
+                      针对「{c.title}」检查主张是否有证据支撑
+                    </p>
+                    <SkillTrigger
+                      skillName={SKILL_NAMES.MARKETING_VERIFY_CLAIMS}
+                      displayName="AI 证据校验"
+                      description="检查内容中的主张是否有证据支撑，列出缺失项"
+                      entityType="ContentPiece"
+                      entityId={c.id}
+                      input={{ contentPiece: { id: c.id, title: c.title, content: c.content.slice(0, 4000) } }}
+                      useCompanyProfile={true}
+                      onSuccess={() => loadData()}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                    />
+                  </div>
+                ))}
               </div>
             )}
           </div>

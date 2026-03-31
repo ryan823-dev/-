@@ -650,6 +650,11 @@ export default function ContentEditorPage() {
             />
           )}
 
+          {/* Radar Content Linkage */}
+          {!isNew && content?.id && (
+            <ContentCandidatePanel contentId={content.id} />
+          )}
+
           {/* Evidence References */}
           <div className="bg-[#FFFCF7] border border-[#E8E0D0] rounded-xl">
             <button
@@ -992,4 +997,5 @@ export default function ContentEditorPage() {
       </Dialog>
     </div>
   );
+}
 }

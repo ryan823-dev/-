@@ -348,6 +348,8 @@ model SeoContent {
   schemaJson   Json?          // Schema.org 结构化数据 (FAQPage JSON-LD)
   geoVersion   String?        // GEO-optimized short version (300-500 words, for AI citation)
   pushRecords  PushRecord[]   // 推送记录
+  contentLinks RadarContentLink[] // 获客雷达内容联动
+  geoDistributions GeoDistributionRecord[] // GEO 分发追踪
 
   @@unique([tenantId, slug])
 }
@@ -1094,6 +1096,8 @@ model RadarCandidate {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  contentLinks    RadarContentLink[] // 获客雷达内容联动
+
   @@unique([sourceId, externalId])
 }
 
@@ -1542,4 +1546,102 @@ model RadarError {
   @@index([adapter, timestamp])
   @@index([tenantId, timestamp])
   @@map("radar_errors")
+}
+
+// ==================== 获客雷达 ↔ 营销内容联动 ====================
+
+enum ContentLinkType {
+  KEYWORD_MATCH    // 关键词匹配
+  INDUSTRY_MATCH   // 行业匹配
+  OUTREACH_EMBED   // 外联嵌入
+  MANUAL           // 手动关联
+}
+
+model RadarContentLink {
+  id              String          @id @default(cuid())
+  tenantId        String
+
+  // 双向关联
+  candidateId     String
+  candidate       RadarCandidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  contentId       String
+  content         SeoContent      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  // 关联类型与细节
+  linkType        ContentLinkType
+  matchScore      Float?          // 匹配度 0-100
+  matchDetails    Json?           // { matchedKeywords[], reasons[], matchMethod }
+
+  // 外联状态追踪
+  outreachStatus  String?         // pending | sent | opened | replied
+  outreachRecordId String?        // 关联 OutreachRecord id
+
+  // 效果追踪
+  clickCount      Int             @default(0)
+  leadGenerated   Boolean         @default(false)
+  conversionNote  String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([candidateId, contentId])
+  @@index([tenantId])
+  @@index([contentId])
+  @@index([candidateId])
+  @@map("radar_content_links")
+}
+
+// ==================== GEO 分发追踪 ====================
+
+enum GeoChannel {
+  CHATGPT         // ChatGPT / ChatGPT Search
+  PERPLEXITY      // Perplexity AI
+  CLAUDE          // Claude
+  GEMINI          // Gemini / Google AI Overviews
+  BING_COPILOT    // Bing Copilot
+  CUSTOM_SITE     // 客户独立站
+}
+
+enum CitationStatus {
+  PENDING         // 待检测
+  CITED           // 已被引用
+  NOT_CITED       // 未被引用
+  PARTIAL         // 部分引用
+  ERROR           // 检测失败
+}
+
+model GeoDistributionRecord {
+  id              String          @id @default(cuid())
+  tenantId        String
+
+  // 关联内容
+  contentId       String
+  content         SeoContent      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  // 分发渠道
+  channel         GeoChannel
+  channelDetail   String?         // e.g. "ChatGPT Search", "Google AI Overviews"
+
+  // 分发内容快照
+  distributedVersion String?      // 分发时的 geoVersion 快照（前200字）
+  queryKeywords   String[]        // 用于检测引用的查询词
+
+  // 引用追踪
+  citationStatus  CitationStatus  @default(PENDING)
+  citationUrl     String?         // AI 引擎引用的 URL
+  citationSnippet String?         // AI 引擎引用的片段
+  citationScore   Float?          // 引用质量评分 0-100
+  lastCheckedAt   DateTime?
+
+  // 检测历史
+  checkCount      Int             @default(0)
+  checkHistory    Json?           // [{ checkedAt, status, snippet }]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([contentId, channel])
+  @@index([tenantId])
+  @@index([citationStatus])
+  @@map("geo_distribution_records")
 }
