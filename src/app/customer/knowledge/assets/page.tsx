@@ -194,7 +194,9 @@ export default function KnowledgeAssetsPage() {
       loadAssets();
       loadPipelineStatus();
     } catch (err) {
-      setUploadProgress(`上传失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      console.error("[Asset Upload] Error:", err);
+      const errorMsg = err instanceof Error ? err.message : '未知错误';
+      setUploadProgress(`上传失败: ${errorMsg}`);
       setTimeout(() => setUploadProgress(null), 5000);
     } finally {
       setIsUploading(false);

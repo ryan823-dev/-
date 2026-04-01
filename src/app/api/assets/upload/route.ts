@@ -81,11 +81,20 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        const presignedUrl = await generatePresignedPutUrl(
+    const presignedUrl = await generatePresignedPutUrl(
           storageKey,
           file.mimeType,
           file.fileSize
-        );
+        ).catch((err) => {
+          console.error("[OSS] generatePresignedPutUrl failed:", {
+            error: err.message,
+            OSS_REGION: process.env.OSS_REGION ? "set" : "MISSING",
+            OSS_ACCESS_KEY_ID: process.env.OSS_ACCESS_KEY_ID ? "set" : "MISSING",
+            OSS_ACCESS_KEY_SECRET: process.env.OSS_ACCESS_KEY_SECRET ? "set" : "MISSING",
+            OSS_BUCKET: process.env.OSS_BUCKET ? "set" : "MISSING",
+          });
+          throw err;
+        });
 
         return {
           assetId: asset.id,
