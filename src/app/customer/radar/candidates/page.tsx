@@ -1199,4 +1199,3 @@ export default function RadarCandidatesPage() {
     </div>
   );
 }
-}

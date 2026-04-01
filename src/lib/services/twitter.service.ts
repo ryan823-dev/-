@@ -209,3 +209,136 @@ export async function refreshTokenIfNeeded(account: {
     return null;
   }
 }
+
+// --- OAuth 1.0a Helpers (for user-provided API keys) ---
+
+function percentEncode(str: string): string {
+  return encodeURIComponent(str)
+    .replace(/!/g, '%21')
+    .replace(/\*/g, '%2A')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29');
+}
+
+function generateOAuth1Header(params: {
+  method: string;
+  url: string;
+  apiKey: string;
+  apiKeySecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+  extraParams?: Record<string, string>;
+}): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: params.apiKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: params.accessToken,
+    oauth_version: '1.0',
+  };
+
+  // Combine oauth params with extra params for signature base
+  const allParams: Record<string, string> = { ...oauthParams, ...(params.extraParams || {}) };
+  const sortedKeys = Object.keys(allParams).sort();
+  const paramString = sortedKeys.map(k => `${percentEncode(k)}=${percentEncode(allParams[k])}`).join('&');
+
+  const signatureBase = [
+    params.method.toUpperCase(),
+    percentEncode(params.url),
+    percentEncode(paramString),
+  ].join('&');
+
+  const signingKey = `${percentEncode(params.apiKeySecret)}&${percentEncode(params.accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(signatureBase).digest('base64');
+
+  oauthParams['oauth_signature'] = signature;
+
+  const headerParts = Object.keys(oauthParams)
+    .sort()
+    .map(k => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`)
+    .join(', ');
+
+  return `OAuth ${headerParts}`;
+}
+
+export async function verifyApiKeys(params: {
+  apiKey: string;
+  apiKeySecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}): Promise<TwitterUserInfo> {
+  if (isDemoMode) {
+    return { id: 'demo_id', username: 'demo_user', name: 'Demo User' };
+  }
+
+  const url = `${TWITTER_API_BASE}/users/me`;
+  const authHeader = generateOAuth1Header({
+    method: 'GET',
+    url,
+    apiKey: params.apiKey,
+    apiKeySecret: params.apiKeySecret,
+    accessToken: params.accessToken,
+    accessTokenSecret: params.accessTokenSecret,
+  });
+
+  const res = await fetch(url, {
+    headers: { Authorization: authHeader },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || data.errors) {
+    throw new Error(data.errors?.[0]?.message || `Twitter API error: ${res.status}`);
+  }
+
+  return {
+    id: data.data.id,
+    username: data.data.username,
+    name: data.data.name,
+  };
+}
+
+export async function publishTweetWithApiKeys(params: {
+  apiKey: string;
+  apiKeySecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+  text: string;
+}): Promise<TwitterPublishResult> {
+  if (isDemoMode) {
+    return { tweetId: `demo_tw_${Date.now()}` };
+  }
+
+  if (params.text.length > 280) {
+    throw new Error("Tweet exceeds 280 character limit");
+  }
+
+  const url = `${TWITTER_API_BASE}/tweets`;
+  const authHeader = generateOAuth1Header({
+    method: 'POST',
+    url,
+    apiKey: params.apiKey,
+    apiKeySecret: params.apiKeySecret,
+    accessToken: params.accessToken,
+    accessTokenSecret: params.accessTokenSecret,
+  });
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text: params.text }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || data.errors) {
+    throw new Error(data.errors?.[0]?.message || `Twitter publish failed: ${res.status}`);
+  }
+
+  return { tweetId: data.data.id };
+}

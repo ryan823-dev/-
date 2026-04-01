@@ -415,13 +415,18 @@ export async function getAsset(id: string): Promise<AssetWithUrls | null> {
 
   if (!asset) return null;
 
-  // 生成访问 URL
-  const viewUrl = await generatePresignedGetUrl(asset.storageKey);
-  const thumbnailUrl = await getThumbnailUrl(
-    asset.storageKey,
-    asset.fileCategory as FileCategory,
-    asset.mimeType
-  );
+  // web:// 虚拟资产不走 OSS
+  const isWebAsset = asset.storageKey.startsWith("web://");
+  const viewUrl = isWebAsset
+    ? asset.storageKey.replace("web://", "")
+    : await generatePresignedGetUrl(asset.storageKey);
+  const thumbnailUrl = isWebAsset
+    ? null
+    : await getThumbnailUrl(
+        asset.storageKey,
+        asset.fileCategory as FileCategory,
+        asset.mimeType
+      );
 
   return {
     ...asset,
@@ -459,6 +464,12 @@ export async function getAssetDownloadUrl(id: string): Promise<string> {
     },
   });
 
+  // web:// 虚拟资产返回原始 URL
+  if (asset.storageKey.startsWith("web://")) {
+    const meta = (asset.metadata || {}) as Record<string, unknown>;
+    return (meta.sourceUrl as string) || asset.storageKey.replace("web://", "");
+  }
+
   // 生成下载 URL（24 小时有效）
   return generatePresignedGetUrl(asset.storageKey, 24 * 3600);
 }
@@ -474,6 +485,11 @@ export async function getAssetThumbnailUrls(
   const urls: Record<string, string | null> = {};
   
   for (const asset of assets) {
+    // web:// 虚拟资产无缩略图
+    if (asset.storageKey.startsWith("web://")) {
+      urls[asset.id] = null;
+      continue;
+    }
     urls[asset.id] = await getThumbnailUrl(
       asset.storageKey,
       asset.fileCategory as FileCategory,
@@ -704,9 +720,13 @@ export async function permanentlyDeleteAssets(ids: string[]): Promise<void> {
 
   if (assets.length === 0) return;
 
-  // 删除 OSS 文件
-  const storageKeys = assets.map((a) => a.storageKey);
-  await deleteObjects(storageKeys);
+  // 删除 OSS 文件（跳过 web:// 虚拟资产）
+  const storageKeys = assets
+    .map((a) => a.storageKey)
+    .filter((key) => !key.startsWith("web://"));
+  if (storageKeys.length > 0) {
+    await deleteObjects(storageKeys);
+  }
 
   // 删除数据库记录
   await db.asset.deleteMany({

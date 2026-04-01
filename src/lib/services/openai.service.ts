@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { PLATFORM_CONFIG } from "@/lib/constants";
+import { getPlatformPrompt, getPlatformCharLimit, type PlatformId } from "@/lib/marketing/platform-rules";
 
 const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -25,22 +26,8 @@ export type GenerateMultiParams = {
   language: string;
 };
 
-const PLATFORM_PROMPTS: Record<string, string> = {
-  x: `You are a professional social media copywriter. Write a concise, engaging tweet.
-Rules:
-- Maximum 280 characters (STRICT)
-- Include 1-2 relevant hashtags within the limit
-- Be punchy and attention-grabbing
-- Use emojis sparingly if appropriate`,
-
-  facebook: `You are a professional social media copywriter. Write an engaging Facebook post.
-Rules:
-- 150-500 characters ideal length
-- Conversational and engaging tone
-- Include a call to action
-- Add 2-3 relevant hashtags at the end
-- Use line breaks for readability`,
-};
+// 平台提示词现在从 platform-rules.ts 获取（整合了 marketing-skills 框架的最佳实践）
+// 旧的 PLATFORM_PROMPTS 已被替换
 
 const TONE_INSTRUCTIONS: Record<string, string> = {
   professional: "Use a professional, authoritative tone suitable for B2B audiences.",
@@ -62,9 +49,9 @@ export async function generateSocialContent(
   }
 
   const client = getClient();
-  const platformPrompt = PLATFORM_PROMPTS[params.platform] || PLATFORM_PROMPTS.facebook;
+  const platformPrompt = getPlatformPrompt(params.platform as PlatformId);
   const toneInstruction = TONE_INSTRUCTIONS[params.tone] || TONE_INSTRUCTIONS.professional;
-  const charLimit = PLATFORM_CONFIG[params.platform as keyof typeof PLATFORM_CONFIG]?.charLimit || 2000;
+  const charLimit = getPlatformCharLimit(params.platform as PlatformId);
   const langInstruction = params.language === "zh-CN"
     ? "Write the content in Chinese (简体中文)."
     : "Write the content in English.";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { FileText, FileSpreadsheet, Presentation, Play, Eye, RotateCw, Loader2, File } from 'lucide-react';
+import { FileText, FileSpreadsheet, Presentation, Play, Eye, RotateCw, Loader2, File, Globe, ExternalLink } from 'lucide-react';
 import { ProcessingStatusBadge } from './processing-status-badge';
 import { triggerAssetProcessing } from '@/actions/assets';
 import type { AssetWithProcessingStatus } from '@/types/assets';
@@ -34,9 +34,14 @@ interface KnowledgeAssetCardProps {
 
 export function KnowledgeAssetCard({ asset, onViewChunks, onProcessingUpdate }: KnowledgeAssetCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const fileIcon = getFileIcon(asset.mimeType);
+  const isWebAsset = asset.storageKey?.startsWith('web://');
+  const fileIcon = isWebAsset
+    ? { icon: Globe, color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)' }
+    : getFileIcon(asset.mimeType);
   const Icon = fileIcon.icon;
   const status = asset.processingMeta.processingStatus;
+  const webSourceUrl = isWebAsset ? asset.storageKey.replace('web://', '') : null;
+  const webHostname = webSourceUrl ? (() => { try { return new URL(webSourceUrl).hostname; } catch { return ''; } })() : null;
 
   const handleProcess = async () => {
     setIsProcessing(true);
@@ -85,8 +90,23 @@ export function KnowledgeAssetCard({ asset, onViewChunks, onProcessingUpdate }: 
             <ProcessingStatusBadge status={status} size="xs" />
           </div>
           <div className="flex items-center gap-2 text-[10px]" style={{ color: '#94A3B8' }}>
-            <span>{formatSize(asset.fileSize)}</span>
-            <span style={{ color: '#CBD5E1' }}>·</span>
+            {isWebAsset && webHostname ? (
+              <>
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium"
+                  style={{ background: 'rgba(139,92,246,0.08)', color: '#8B5CF6' }}
+                >
+                  <Globe size={9} />
+                  {webHostname}
+                </span>
+                <span style={{ color: '#CBD5E1' }}>·</span>
+              </>
+            ) : (
+              <>
+                <span>{formatSize(asset.fileSize)}</span>
+                <span style={{ color: '#CBD5E1' }}>·</span>
+              </>
+            )}
             <span>{new Date(asset.createdAt).toLocaleDateString('zh-CN')}</span>
             {asset.processingMeta.chunkCount !== undefined && (
               <>
@@ -170,6 +190,29 @@ export function KnowledgeAssetCard({ asset, onViewChunks, onProcessingUpdate }: 
           >
             {asset.processingMeta.processingError}
           </span>
+        )}
+
+        {isWebAsset && webSourceUrl && (
+          <a
+            href={webSourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ml-auto"
+            style={{
+              background: 'rgba(139,92,246,0.06)',
+              color: '#8B5CF6',
+              border: '1px solid rgba(139,92,246,0.15)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(139,92,246,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(139,92,246,0.06)';
+            }}
+          >
+            <ExternalLink size={11} />
+            查看原文
+          </a>
         )}
       </div>
     </div>

@@ -31,6 +31,8 @@ import {
   Package,
   SearchCheck,
   BrainCircuit,
+  Send,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -193,6 +195,10 @@ export const navConfig: NavItem[] = [
     order: 4,
     group: 'core',
     healthSource: 'social.status',
+    subItems: [
+      { key: 'posts', label: '内容发布', href: '/customer/social', icon: Send, order: 1 },
+      { key: 'accounts', label: '账号管理', href: '/customer/social/accounts', icon: KeyRound, order: 2 },
+    ],
   },
 
   // ────────────────────────────────────────

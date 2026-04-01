@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { 
   Globe, 
   Calendar, 
@@ -36,12 +37,10 @@ type ViewMode = 'list' | 'create';
 
 // Platform icons and info
 const PLATFORMS = [
-  { id: 'linkedin', name: 'LinkedIn', color: 'bg-blue-600', textColor: 'text-blue-600' },
+  { id: 'linkedin', name: 'LinkedIn', color: 'bg-blue-700', textColor: 'text-blue-700' },
   { id: 'x', name: 'Twitter/X', color: 'bg-slate-800', textColor: 'text-slate-800' },
   { id: 'facebook', name: 'Facebook', color: 'bg-blue-500', textColor: 'text-blue-500' },
-  { id: 'instagram', name: 'Instagram', color: 'bg-gradient-to-br from-purple-500 to-pink-500', textColor: 'text-pink-500' },
-  { id: 'wechat', name: '微信公众号', color: 'bg-green-500', textColor: 'text-green-500' },
-  { id: 'weibo', name: '微博', color: 'bg-red-500', textColor: 'text-red-500' },
+  { id: 'youtube', name: 'YouTube', color: 'bg-red-600', textColor: 'text-red-600' },
 ];
 
 type SocialAccount = {
@@ -279,8 +278,15 @@ export default function SocialPage() {
           <Globe size={20} className="text-amber-600" />
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-800">社媒账号未授权</p>
-            <p className="text-xs text-amber-600">请在运营后台授权接入社交媒体账号以启用自动发布功能</p>
+            <p className="text-xs text-amber-600">授权接入社交媒体账号以启用自动发布功能</p>
           </div>
+          <Link
+            href="/customer/social/accounts"
+            className="px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-1.5 shrink-0"
+            style={{ background: '#D4AF37', color: '#0B1220', boxShadow: '0 4px 16px -2px rgba(212,175,55,0.35)' }}
+          >
+            前往授权
+          </Link>
         </div>
       )}
 
@@ -399,6 +405,18 @@ export default function SocialPage() {
                         <p className="text-[10px] text-slate-400 mt-2">
                           {content.length} 字符
                         </p>
+                        {platform === 'linkedin' && (
+                          <button
+                            onClick={() => {
+                              const text = encodeURIComponent(content);
+                              window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${text}`, '_blank');
+                            }}
+                            className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-medium flex items-center gap-1 bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+                          >
+                            <Share2 size={10} />
+                            Share on LinkedIn
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -563,6 +581,31 @@ export default function SocialPage() {
                           <p className="text-xs text-slate-600 line-clamp-3 whitespace-pre-wrap">
                             {version.content}
                           </p>
+
+                          {/* LinkedIn Share Button */}
+                          {version.platform === 'linkedin' && !version.platformPostId && (
+                            <button
+                              onClick={() => {
+                                const text = encodeURIComponent(version.content);
+                                window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${text}`, '_blank');
+                              }}
+                              className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-medium flex items-center gap-1 bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+                            >
+                              <Share2 size={10} />
+                              Share on LinkedIn
+                            </button>
+                          )}
+                          {version.platform === 'linkedin' && version.metrics && (version.metrics as Record<string, string>).shareUrl && (
+                            <button
+                              onClick={() => {
+                                window.open((version.metrics as Record<string, string>).shareUrl, '_blank');
+                              }}
+                              className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-medium flex items-center gap-1 bg-blue-700 text-white hover:bg-blue-800 transition-colors"
+                            >
+                              <Share2 size={10} />
+                              Open LinkedIn Share
+                            </button>
+                          )}
                           
                           {/* Metrics */}
                           {version.metrics && Object.keys(version.metrics).length > 0 && (

@@ -175,7 +175,7 @@ export async function getPendingActions(): Promise<PendingAction[]> {
       title: `${failedPosts} 条内容发布失败`,
       module: '声量枢纽',
       action: '重新发布',
-      actionLink: '/c/social',
+      actionLink: '/customer/social',
     });
   }
 
@@ -187,7 +187,7 @@ export async function getPendingActions(): Promise<PendingAction[]> {
       title: '创建企业能力画像',
       module: '知识引擎',
       action: '立即创建',
-      actionLink: '/c/knowledge',
+      actionLink: '/customer/knowledge',
     });
   }
 
@@ -198,7 +198,7 @@ export async function getPendingActions(): Promise<PendingAction[]> {
       title: '社媒账号未授权',
       module: '声量枢纽',
       action: '授权接入',
-      actionLink: '/c/social',
+      actionLink: '/customer/social/accounts',
     });
   }
 
@@ -209,7 +209,7 @@ export async function getPendingActions(): Promise<PendingAction[]> {
       title: `${highIntentLeads} 条高意向线索待跟进`,
       module: '获客雷达',
       action: '查看线索',
-      actionLink: '/c/radar',
+      actionLink: '/customer/radar',
     });
   }
 
@@ -221,7 +221,7 @@ export async function getPendingActions(): Promise<PendingAction[]> {
       title: `${draftContents} 篇内容待发布`,
       module: '增长系统',
       action: '发布内容',
-      actionLink: '/c/marketing',
+      actionLink: '/customer/marketing',
     });
   }
 

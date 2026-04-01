@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Upload, Loader2, RefreshCw, Search as SearchIcon, 
   FileText, AlertCircle, CheckCircle2, Clock, RotateCw,
-  Grid3X3, List, Sparkles, Database, ChevronRight,
+  Grid3X3, List, Sparkles, Database, ChevronRight, Globe,
 } from 'lucide-react';
 import { getKnowledgeAssets, triggerAssetProcessing } from '@/actions/assets';
 import { getKnowledgePipelineStatus } from '@/actions/pipeline';
@@ -20,6 +20,7 @@ import { KnowledgeAssetCard } from '@/components/knowledge/knowledge-asset-card'
 import { AssetChunkPreview } from '@/components/knowledge/asset-chunk-preview';
 import { ContentSearchBar } from '@/components/knowledge/content-search-bar';
 import { EngineHeader, EmptyStateGuide, NextStepBanner } from '@/components/knowledge/engine-header';
+import { WebImportDialog } from '@/components/knowledge/web-import-dialog';
 import type { AssetWithProcessingStatus } from '@/types/assets';
 import type { AssetProcessingStatus } from '@/types/knowledge';
 import type { PipelineStatus } from '@/lib/knowledge/pipeline';
@@ -49,6 +50,7 @@ export default function KnowledgeAssetsPage() {
   // 正在处理中的资产ID集合（用于轮询）
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [webImportOpen, setWebImportOpen] = useState(false);
 
   const loadPipelineStatus = useCallback(async () => {
     try {
@@ -287,7 +289,7 @@ export default function KnowledgeAssetsPage() {
               </p>
             </div>
 
-            {/* 上传按钮 + 进度 */}
+            {/* 上传按钮 + 网站智采 + 进度 */}
             <div className="flex items-center gap-3 shrink-0">
               {uploadProgress && (
                 <div className="flex items-center gap-2 text-xs" style={{ color: '#D4AF37' }}>
@@ -295,6 +297,31 @@ export default function KnowledgeAssetsPage() {
                   <span>{uploadProgress}</span>
                 </div>
               )}
+              <button
+                onClick={() => setWebImportOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  background: 'transparent',
+                  color: '#D4AF37',
+                  border: '1.5px solid rgba(212,175,55,0.45)',
+                  boxShadow: '0 0 16px -4px rgba(212,175,55,0.2)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(212,175,55,0.1)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(212,175,55,0.7)';
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 24px -4px rgba(212,175,55,0.35)';
+                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(212,175,55,0.45)';
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 16px -4px rgba(212,175,55,0.2)';
+                  (e.currentTarget as HTMLButtonElement).style.transform = '';
+                }}
+              >
+                <Globe size={15} />
+                网站智采
+              </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
@@ -660,6 +687,13 @@ export default function KnowledgeAssetsPage() {
           />
         </>
       )}
+
+      {/* Web Import Dialog */}
+      <WebImportDialog
+        open={webImportOpen}
+        onClose={() => setWebImportOpen(false)}
+        onComplete={() => { loadAssets(); loadPipelineStatus(); }}
+      />
     </div>
   );
 }

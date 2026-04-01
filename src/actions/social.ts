@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { generateMultiPlatformContent } from "@/lib/services/openai.service";
 import * as facebookService from "@/lib/services/facebook.service";
 import * as twitterService from "@/lib/services/twitter.service";
+import * as youtubeService from "@/lib/services/youtube.service";
 import { formatPublishError } from "@/lib/utils/social.utils";
 import { requireDecider } from "@/lib/permissions";
 
@@ -125,7 +126,7 @@ export async function createSocialPost(data: {
     include: { versions: true },
   });
 
-  revalidatePath("/zh-CN/social");
+  revalidatePath("/customer/social");
   return post;
 }
 
@@ -170,7 +171,7 @@ export async function updateSocialPost(
     });
   }
 
-  revalidatePath("/zh-CN/social");
+  revalidatePath("/customer/social");
   return post;
 }
 
@@ -188,7 +189,7 @@ export async function deleteSocialPost(postId: string) {
     data: { deletedAt: new Date() },
   });
 
-  revalidatePath("/zh-CN/social");
+  revalidatePath("/customer/social");
 }
 
 // ==================== PUBLISH ====================
@@ -228,6 +229,25 @@ export async function publishSocialPost(postId: string): Promise<{
       continue;
     }
 
+    // LinkedIn uses Share URL mode - no API account needed
+    if (version.platform === "linkedin") {
+      const shareText = encodeURIComponent(version.content);
+      const shareUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${shareText}`;
+      const linkedinPostId = `linkedin_share_${Date.now()}`;
+      await db.postVersion.update({
+        where: { id: version.id },
+        data: {
+          platformPostId: linkedinPostId,
+          publishedAt: new Date(),
+          error: null,
+          publishAttempts: { increment: 1 },
+          metrics: { shareUrl },
+        },
+      });
+      results.push({ platform: version.platform, success: true, postId: linkedinPostId });
+      continue;
+    }
+
     // Find active account for this platform
     const account = await db.socialAccount.findFirst({
       where: {
@@ -255,19 +275,21 @@ export async function publishSocialPost(postId: string): Promise<{
 
     try {
       let platformPostId: string;
+      const metadata = account.metadata as Record<string, string>;
+      const isApiKeys = metadata?.authMethod === 'api_keys';
 
       if (version.platform === "facebook") {
-        // Refresh token if needed
-        const refreshed = await facebookService.refreshTokenIfNeeded(account);
-        if (refreshed) {
-          await db.socialAccount.update({
-            where: { id: account.id },
-            data: { accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt },
-          });
-          account.accessToken = refreshed.accessToken;
+        if (!isApiKeys) {
+          const refreshed = await facebookService.refreshTokenIfNeeded(account);
+          if (refreshed) {
+            await db.socialAccount.update({
+              where: { id: account.id },
+              data: { accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt },
+            });
+            account.accessToken = refreshed.accessToken;
+          }
         }
 
-        const metadata = account.metadata as Record<string, string>;
         const result = await facebookService.publishToPage({
           pageAccessToken: account.accessToken!,
           pageId: metadata.pageId || account.accountId,
@@ -275,8 +297,37 @@ export async function publishSocialPost(postId: string): Promise<{
         });
         platformPostId = result.postId;
       } else if (version.platform === "x") {
-        // Refresh token if needed
-        const refreshed = await twitterService.refreshTokenIfNeeded(account);
+        if (isApiKeys) {
+          const result = await twitterService.publishTweetWithApiKeys({
+            apiKey: metadata.apiKey,
+            apiKeySecret: metadata.apiKeySecret,
+            accessToken: account.accessToken!,
+            accessTokenSecret: account.refreshToken!,
+            text: version.content,
+          });
+          platformPostId = result.tweetId;
+        } else {
+          const refreshed = await twitterService.refreshTokenIfNeeded(account);
+          if (refreshed) {
+            await db.socialAccount.update({
+              where: { id: account.id },
+              data: {
+                accessToken: refreshed.accessToken,
+                refreshToken: refreshed.refreshToken,
+                expiresAt: refreshed.expiresAt,
+              },
+            });
+            account.accessToken = refreshed.accessToken;
+          }
+
+          const result = await twitterService.publishTweet({
+            accessToken: account.accessToken!,
+            text: version.content,
+          });
+          platformPostId = result.tweetId;
+        }
+      } else if (version.platform === "youtube") {
+        const refreshed = await youtubeService.refreshTokenIfNeeded(account);
         if (refreshed) {
           await db.socialAccount.update({
             where: { id: account.id },
@@ -289,11 +340,12 @@ export async function publishSocialPost(postId: string): Promise<{
           account.accessToken = refreshed.accessToken;
         }
 
-        const result = await twitterService.publishTweet({
+        const result = await youtubeService.publishCommunityPost({
           accessToken: account.accessToken!,
+          channelId: metadata.channelId || account.accountId,
           text: version.content,
         });
-        platformPostId = result.tweetId;
+        platformPostId = result.postId;
       } else {
         throw new Error(`Unsupported platform: ${version.platform}`);
       }
@@ -334,7 +386,7 @@ export async function publishSocialPost(postId: string): Promise<{
     },
   });
 
-  revalidatePath("/zh-CN/social");
+  revalidatePath("/customer/social");
 
   return { success: allSuccess, results };
 }
@@ -349,7 +401,7 @@ export async function scheduleSocialPost(postId: string, scheduledAt: Date) {
     data: { status: "scheduled", scheduledAt },
   });
 
-  revalidatePath("/zh-CN/social");
+  revalidatePath("/customer/social");
 }
 
 export async function retryFailedPublish(postId: string) {
@@ -391,5 +443,137 @@ export async function disconnectSocialAccount(accountId: string) {
     data: { isActive: false, accessToken: null, refreshToken: null },
   });
 
-  revalidatePath("/zh-CN/social/accounts");
+  revalidatePath("/customer/social/accounts");
+}
+
+// ==================== CUSTOMER CREDENTIAL MANAGEMENT ====================
+
+export async function saveSocialCredentials(data: {
+  platform: string;
+  accountName: string;
+  credentials: Record<string, string>;
+}): Promise<{ success: boolean; accountId?: string; error?: string }> {
+  if (isDemoMode) {
+    return { success: true, accountId: `demo_${data.platform}_${Date.now()}` };
+  }
+
+  const session = await getSession();
+  const tenantId = session.user.tenantId;
+
+  try {
+    let accessToken: string | null = null;
+    let refreshToken: string | null = null;
+    let accountId: string;
+    const metadata: Record<string, unknown> = { authMethod: 'api_keys' };
+
+    if (data.platform === 'x') {
+      accessToken = data.credentials.accessToken;
+      refreshToken = data.credentials.accessTokenSecret;
+      accountId = data.credentials.accountId || `x_${Date.now()}`;
+      metadata.apiKey = data.credentials.apiKey;
+      metadata.apiKeySecret = data.credentials.apiKeySecret;
+      metadata.username = data.accountName;
+    } else if (data.platform === 'facebook') {
+      accessToken = data.credentials.pageAccessToken;
+      accountId = data.credentials.pageId;
+      metadata.pageId = data.credentials.pageId;
+      metadata.pageName = data.accountName;
+    } else {
+      return { success: false, error: `Unsupported platform: ${data.platform}` };
+    }
+
+    const account = await db.socialAccount.upsert({
+      where: {
+        tenantId_platform_accountId: {
+          tenantId,
+          platform: data.platform,
+          accountId,
+        },
+      },
+      create: {
+        tenantId,
+        platform: data.platform,
+        accountName: data.accountName,
+        accountId,
+        accessToken,
+        refreshToken,
+        expiresAt: null,
+        metadata,
+        isActive: true,
+      },
+      update: {
+        accountName: data.accountName,
+        accessToken,
+        refreshToken,
+        expiresAt: null,
+        metadata,
+        isActive: true,
+      },
+    });
+
+    revalidatePath("/customer/social/accounts");
+    revalidatePath("/customer/social");
+    return { success: true, accountId: account.id };
+  } catch (err) {
+    console.error('[saveSocialCredentials] Error:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to save credentials' };
+  }
+}
+
+export async function testSocialConnection(data: {
+  platform: string;
+  credentials: Record<string, string>;
+}): Promise<{ success: boolean; accountName?: string; accountId?: string; error?: string }> {
+  if (isDemoMode) {
+    return { success: true, accountName: 'Demo Account', accountId: 'demo_id' };
+  }
+
+  try {
+    if (data.platform === 'x') {
+      const userInfo = await twitterService.verifyApiKeys({
+        apiKey: data.credentials.apiKey,
+        apiKeySecret: data.credentials.apiKeySecret,
+        accessToken: data.credentials.accessToken,
+        accessTokenSecret: data.credentials.accessTokenSecret,
+      });
+      return {
+        success: true,
+        accountName: `@${userInfo.username}`,
+        accountId: userInfo.id,
+      };
+    } else if (data.platform === 'facebook') {
+      const res = await fetch(
+        `https://graph.facebook.com/v21.0/${data.credentials.pageId}?fields=name,id&access_token=${data.credentials.pageAccessToken}`
+      );
+      const fbData = await res.json();
+      if (fbData.error) {
+        throw new Error(fbData.error.message || 'Facebook API error');
+      }
+      return {
+        success: true,
+        accountName: fbData.name || data.credentials.pageId,
+        accountId: fbData.id,
+      };
+    }
+
+    return { success: false, error: `Unsupported platform: ${data.platform}` };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Connection test failed',
+    };
+  }
+}
+
+export async function deleteSocialAccountHard(accountId: string) {
+  if (isDemoMode) return;
+
+  const session = await getSession();
+
+  await db.socialAccount.delete({
+    where: { id: accountId, tenantId: session.user.tenantId },
+  });
+
+  revalidatePath("/customer/social/accounts");
+  revalidatePath("/customer/social");
 }

@@ -58,7 +58,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'brain',
       status: 'pending',
       action: '立即创建',
-      actionLink: '/c/knowledge',
+      actionLink: '/customer/knowledge',
       createdAt: now,
     });
   } else {
@@ -76,7 +76,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
         moduleIcon: 'brain',
         status: 'pending',
         action: '上传资料',
-        actionLink: '/c/knowledge',
+        actionLink: '/customer/knowledge',
         createdAt: now,
       });
     }
@@ -102,7 +102,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'radar',
       status: 'pending',
       action: '查看线索',
-      actionLink: '/c/radar',
+      actionLink: '/customer/radar',
       createdAt: now,
     });
   }
@@ -126,7 +126,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'file-text',
       status: 'pending',
       action: '发布内容',
-      actionLink: '/c/marketing',
+      actionLink: '/customer/marketing',
       createdAt: now,
     });
   }
@@ -149,7 +149,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'globe',
       status: 'pending',
       action: '授权账号',
-      actionLink: '/c/social',
+      actionLink: '/customer/social/accounts',
       createdAt: now,
     });
   }
@@ -174,7 +174,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'globe',
       status: 'in_progress',
       action: '查看排期',
-      actionLink: '/c/social',
+      actionLink: '/customer/social',
       createdAt: now,
     });
   }
@@ -198,7 +198,7 @@ export async function getSystemTodos(): Promise<TodoItem[]> {
       moduleIcon: 'globe',
       status: 'pending',
       action: '重新发布',
-      actionLink: '/c/social',
+      actionLink: '/customer/social',
       createdAt: now,
     });
   }
