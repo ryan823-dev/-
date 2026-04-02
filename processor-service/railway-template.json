@@ -1,0 +1,77 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install && npx prisma generate"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5,
+    "numReplicas": 1
+  },
+  "templates": {
+    "vertax-processor": {
+      "name": "Vertax Processor Service",
+      "description": "Document processing microservice for PDF, Word, and image OCR",
+      "variables": [
+        {
+          "name": "DATABASE_URL",
+          "description": "PostgreSQL connection string from your main application",
+          "example": "postgresql://user:password@host:5432/database?schema=public",
+          "required": true
+        },
+        {
+          "name": "DIRECT_URL",
+          "description": "PostgreSQL direct connection URL (same as DATABASE_URL)",
+          "example": "postgresql://user:password@host:5432/database?schema=public",
+          "required": true
+        },
+        {
+          "name": "OSS_REGION",
+          "description": "Aliyun OSS region",
+          "example": "oss-cn-hangzhou",
+          "required": true
+        },
+        {
+          "name": "OSS_ACCESS_KEY_ID",
+          "description": "Aliyun OSS Access Key ID",
+          "example": "LTAI5t...",
+          "required": true
+        },
+        {
+          "name": "OSS_ACCESS_KEY_SECRET",
+          "description": "Aliyun OSS Access Key Secret",
+          "example": "abc123...",
+          "required": true
+        },
+        {
+          "name": "OSS_BUCKET",
+          "description": "Aliyun OSS bucket name",
+          "example": "vertax-assets",
+          "required": true
+        },
+        {
+          "name": "PROCESSOR_API_KEY",
+          "description": "API key for authentication (generate with: openssl rand -base64 32)",
+          "example": "auto-generated-secure-key",
+          "required": true
+        },
+        {
+          "name": "NODE_ENV",
+          "description": "Environment mode",
+          "default": "production",
+          "required": false
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Logging level",
+          "default": "info",
+ "required": false
+        }
+      ]
+    }
+  }
+}
