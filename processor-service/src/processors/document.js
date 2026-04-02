@@ -1,7 +1,4 @@
 import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
-import pptxParser from 'node-pptx-parser';
-import xlsx from 'xlsx';
 
 /**
  * 文本分块配置
@@ -83,10 +80,49 @@ async function extractPdfText(buffer) {
  */
 async function extractWordText(buffer) {
   try {
+    const mammoth = (await import('mammoth')).default;
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   } catch (error) {
     throw new Error(`Word 解析失败: ${error.message}`);
+  }
+}
+
+/**
+ * 从 PPT 文档提取文本
+ * @param {Buffer} buffer PPT 文件内容
+ * @returns {string} 提取的文本
+ */
+async function extractPPTText(buffer) {
+  try {
+    const pptxParser = (await import('node-pptx-parser')).default;
+    const result = await pptxParser.parse(buffer);
+    return typeof result === 'string' ? result : JSON.stringify(result);
+  } catch (error) {
+    throw new Error(`PPT 解析失败: ${error.message}`);
+  }
+}
+
+/**
+ * 从 Excel 文档提取文本
+ * @param {Buffer} buffer Excel 文件内容
+ * @returns {string} 提取的文本
+ */
+async function extractExcelText(buffer) {
+  try {
+    const xlsx = (await import('xlsx')).default;
+    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    const texts = [];
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const csv = xlsx.utils.sheet_to_csv(sheet);
+      if (csv.trim()) {
+        texts.push(`[${sheetName}]\n${csv}`);
+      }
+    }
+    return texts.join('\n\n');
+  } catch (error) {
+    throw new Error(`Excel 解析失败: ${error.message}`);
   }
 }
 
