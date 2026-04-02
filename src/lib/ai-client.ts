@@ -1,9 +1,20 @@
 /**
  * AI 客户端 - DashScope (通义千问) OpenAI 兼容模式
  *
- * 使用 OpenAI 兼容的 API 格式调用 DashScope
- * 支持 qwen-max / qwen-plus / deepseek 等模型
+ * 使用 curl + 流式模式(stream:true) 调用 DashScope API。
+ * 原因：
+ *   1. Node.js https 模块在此 Windows 环境下 30s+ 请求会 ECONNRESET
+ *   2. curl 使用 Windows Schannel 不受此限制
+ *   3. 流式模式保持数据持续传输，避免空闲连接被中间设备重置
+ *
+ * 重要：使用异步 spawn（非 spawnSync）避免阻塞 Node.js 事件循环，
+ * 否则 Next.js server action 长时间无法处理心跳/keep-alive 会导致连接中断。
  */
+
+import { spawn } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const DASHSCOPE_BASE_URL =
   "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
@@ -18,6 +29,8 @@ interface ChatCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+  /** curl max-time in seconds (default 300) */
+  timeout?: number;
 }
 
 interface ChatCompletionResponse {
@@ -31,7 +44,90 @@ interface ChatCompletionResponse {
 }
 
 /**
+ * 解析 SSE (Server-Sent Events) 流式响应，拼接为完整内容
+ */
+function parseSSEResponse(
+  sseText: string,
+  fallbackModel: string
+): ChatCompletionResponse {
+  let fullContent = "";
+  let model = fallbackModel;
+  let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+  for (const line of sseText.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const data = line.slice(6).trim();
+    if (data === "[DONE]") continue;
+
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.model) model = parsed.model;
+      if (parsed.usage) {
+        usage = {
+          promptTokens: parsed.usage.prompt_tokens || 0,
+          completionTokens: parsed.usage.completion_tokens || 0,
+          totalTokens: parsed.usage.total_tokens || 0,
+        };
+      }
+      const delta = parsed.choices?.[0]?.delta;
+      if (delta?.content) fullContent += delta.content;
+    } catch {
+      /* skip malformed chunks */
+    }
+  }
+
+  return { content: fullContent, model, usage };
+}
+
+/**
+ * 异步执行 curl 命令，返回 stdout/stderr
+ */
+function execCurl(args: string[], timeoutMs: number): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("curl", args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let settled = false;
+
+    proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    proc.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGTERM");
+        reject(new Error(`curl timed out after ${timeoutMs}ms`));
+      }
+    }, timeoutMs);
+
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      if (!settled) {
+        settled = true;
+        resolve({
+          stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+          stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+          exitCode: code ?? 1,
+        });
+      }
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      if (!settled) {
+        settled = true;
+        reject(new Error(`curl spawn error: ${err.message}`));
+      }
+    });
+  });
+}
+
+/**
  * 调用 DashScope AI 模型
+ * 使用异步 curl + stream:true 绕过 Node.js TLS 和空闲连接超时问题
  */
 export async function chatCompletion(
   messages: ChatMessage[],
@@ -47,45 +143,78 @@ export async function chatCompletion(
     temperature = 0.3,
     maxTokens = 4096,
     topP = 0.8,
+    timeout = 300,
   } = options;
 
-  const response = await fetch(DASHSCOPE_BASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      top_p: topP,
-    }),
+  const requestBody = JSON.stringify({
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+    top_p: topP,
+    stream: true,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `DashScope API error (${response.status}): ${errorText}`
+  const ts = Date.now();
+  const tmpFile = join(tmpdir(), `dashscope-${ts}-${Math.random().toString(36).slice(2, 8)}.json`);
+  writeFileSync(tmpFile, requestBody, "utf-8");
+
+  console.log(
+    `[chatCompletion] curl+stream (async), model=${model}, maxTokens=${maxTokens}, bodySize=${requestBody.length}`
+  );
+
+  try {
+    const result = await execCurl([
+      "-s", "-S",
+      "--max-time", String(timeout),
+      "-X", "POST",
+      DASHSCOPE_BASE_URL,
+      "-H", "Content-Type: application/json",
+      "-H", `Authorization: Bearer ${apiKey}`,
+      "--data-binary", `@${tmpFile}`,
+    ], (timeout + 10) * 1000);
+
+    const stderr = (result.stderr || "").trim();
+    const stdout = (result.stdout || "").trim();
+
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `curl failed (exit ${result.exitCode}): ${stderr || "unknown"}`
+      );
+    }
+
+    if (!stdout) {
+      throw new Error(`curl returned empty response. stderr: ${stderr}`);
+    }
+
+    // 解析 SSE 流式响应
+    const response = parseSSEResponse(stdout, model);
+
+    if (!response.content) {
+      // 可能是非流式错误响应
+      try {
+        const errorData = JSON.parse(stdout);
+        if (errorData.error) {
+          throw new Error(`DashScope error: ${JSON.stringify(errorData.error)}`);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith("DashScope")) throw e;
+      }
+      throw new Error("DashScope returned empty content");
+    }
+
+    console.log(
+      `[chatCompletion] done: ${response.content.length} chars, model=${response.model}, ${Date.now() - ts}ms`
     );
+
+    return response;
+  } finally {
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      /* ignore */
+    }
   }
-
-  const data = await response.json();
-
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error("DashScope API returned empty response");
-  }
-
-  return {
-    content: data.choices[0].message.content,
-    model: data.model || model,
-    usage: {
-      promptTokens: data.usage?.prompt_tokens || 0,
-      completionTokens: data.usage?.completion_tokens || 0,
-      totalTokens: data.usage?.total_tokens || 0,
-    },
-  };
 }
 
 /**
@@ -112,13 +241,7 @@ export const aiClient = {
           }
         );
         return {
-          choices: [
-            {
-              message: {
-                content: response.content,
-              },
-            },
-          ],
+          choices: [{ message: { content: response.content } }],
           model: response.model,
           usage: {
             prompt_tokens: response.usage.promptTokens,
@@ -184,7 +307,6 @@ export async function analyzeCompanyProfile(
 }> {
   const combinedText = materialTexts.join("\n\n---\n\n");
 
-  // 截取最多 60000 字符（留空间给 prompt）
   const truncatedText =
     combinedText.length > 60000
       ? combinedText.slice(0, 60000) + "\n...(内容已截断)"
@@ -205,9 +327,7 @@ export async function analyzeCompanyProfile(
     }
   );
 
-  // 提取 JSON
   let jsonStr = response.content.trim();
-  // 去除可能的 markdown code block 包裹
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
   }
@@ -216,7 +336,7 @@ export async function analyzeCompanyProfile(
   try {
     analysis = JSON.parse(jsonStr);
   } catch (error) {
-    console.error('[parseAIResponse] JSON parse error:', error);
+    console.error("[parseAIResponse] JSON parse error:", error);
     throw new Error("AI 返回的分析结果格式异常，请重试");
   }
 

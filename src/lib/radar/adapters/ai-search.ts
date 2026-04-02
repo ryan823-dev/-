@@ -241,7 +241,7 @@ export class AISearchAdapter implements RadarAdapter {
       q: query,
       api_key: process.env.SERPAPI_KEY!,
       engine: 'google',
-      num: '10',
+      num: '30', // 增加到30条，最大化潜在客户挖掘
       hl: 'en',
       gl: 'us',
     });
@@ -268,7 +268,7 @@ export class AISearchAdapter implements RadarAdapter {
    */
   private async searchWithBrave(query: string): Promise<WebSearchResult[]> {
     const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=20`, // Brave免费版最大20条
       {
         headers: {
           'Accept': 'application/json',

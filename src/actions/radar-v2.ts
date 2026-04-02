@@ -68,6 +68,27 @@ export interface RadarStatsData {
   runningTasks: number;
 }
 
+// ==================== 去重工具函数 ====================
+
+/**
+ * 规范化网站域名用于跨源去重
+ * 例如: "https://www.example.com/path" -> "example.com"
+ */
+function normalizeDomainForDedup(website: string | null | undefined): string | null {
+  if (!website) return null;
+  try {
+    const url = new URL(website.startsWith('http') ? website : `https://${website}`);
+    let domain = url.hostname.toLowerCase();
+    // 移除 www. 前缀
+    if (domain.startsWith('www.')) {
+      domain = domain.slice(4);
+    }
+    return domain;
+  } catch {
+    return null;
+  }
+}
+
 // ==================== 数据源管理 ====================
 
 /**
@@ -535,26 +556,76 @@ export async function importCandidateToCompanyV2(
 ): Promise<ProspectCompany> {
   const session = await auth();
   if (!session?.user?.tenantId || !session.user.id) throw new Error('Unauthorized');
-  
+
   const candidate = await prisma.radarCandidate.findUnique({
     where: { id: candidateId },
     include: { source: true },
   });
-  
+
   if (!candidate || candidate.tenantId !== session.user.tenantId) {
     throw new Error('Candidate not found');
   }
-  
+
+  // 检查是否已导入
+  if (candidate.status === 'IMPORTED') {
+    throw new Error('Candidate already imported');
+  }
+
+  const companyName = candidate.buyerName || candidate.displayName;
+  const companyCountry = candidate.buyerCountry || candidate.country;
+
+  // 去重检查：基于网站域名
+  let existingCompany: { id: string } | null = null;
+  if (candidate.website) {
+    const domain = normalizeDomainForDedup(candidate.website);
+    if (domain) {
+      existingCompany = await prisma.prospectCompany.findFirst({
+        where: {
+          tenantId: session.user.tenantId,
+          website: { contains: domain, mode: 'insensitive' },
+          deletedAt: null,
+        },
+      });
+    }
+  }
+
+  // 去重检查：基于公司名称 + 国家
+  if (!existingCompany && companyName) {
+    existingCompany = await prisma.prospectCompany.findFirst({
+      where: {
+        tenantId: session.user.tenantId,
+        name: { equals: companyName, mode: 'insensitive' },
+        country: companyCountry || null,
+        deletedAt: null,
+      },
+    });
+  }
+
+  // 如果已存在，返回已有记录并标记候选已导入
+  if (existingCompany) {
+    await prisma.radarCandidate.update({
+      where: { id: candidateId },
+      data: {
+        status: 'IMPORTED',
+        importedToType: 'ProspectCompany',
+        importedToId: existingCompany.id,
+        importedAt: new Date(),
+        importedBy: session.user.id,
+      },
+    });
+    return prisma.prospectCompany.findUnique({ where: { id: existingCompany.id } }) as Promise<ProspectCompany>;
+  }
+
   // 创建 ProspectCompany
   const company = await prisma.prospectCompany.create({
     data: {
       tenantId: session.user.tenantId,
-      name: candidate.buyerName || candidate.displayName,
+      name: companyName,
       website: candidate.website,
       phone: candidate.phone,
       email: candidate.email,
       address: candidate.address,
-      country: candidate.buyerCountry || candidate.country,
+      country: companyCountry,
       city: candidate.city,
       industry: candidate.industry,
       companySize: candidate.companySize,

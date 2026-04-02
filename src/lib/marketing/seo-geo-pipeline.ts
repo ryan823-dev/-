@@ -53,6 +53,13 @@ export interface SerpAnalysis {
   differentiationGaps: string[];
 }
 
+// Quality check result (defined early for ContentPackage reference)
+export interface QualityCheckResult {
+  passed: boolean;
+  issues: string[];
+  warnings: string[];
+}
+
 export interface ContentPackage {
   // Block 1
   metaTitle: string;
@@ -76,6 +83,9 @@ export interface ContentPackage {
   keywordMatrix: KeywordMatrix;
   serpAnalysis: SerpAnalysis;
   wordCount: number;
+
+  // Quality check result
+  qualityCheck?: QualityCheckResult;
 }
 
 export interface PipelineContext {
@@ -183,6 +193,7 @@ interface SerpApiOrganicResult {
   title?: string;
   link?: string;
   snippet?: string;
+  source?: 'google' | 'brave';
 }
 
 interface SerpApiResponse {
@@ -196,52 +207,125 @@ async function fetchSerpData(keyword: string): Promise<SerpApiResponse | null> {
   const braveKey = process.env.BRAVE_SEARCH_API_KEY;
   if (!serpApiKey && !braveKey) return null;
 
-  try {
-    // SerpAPI 主渠道（Google 索引）
-    if (serpApiKey) {
-      const url = new URL('https://serpapi.com/search');
-      url.searchParams.set('q', keyword);
-      url.searchParams.set('api_key', serpApiKey);
-      url.searchParams.set('engine', 'google');
-      url.searchParams.set('hl', 'en');
-      url.searchParams.set('gl', 'us');
-      url.searchParams.set('num', '10');
+  // 并发调用 SerpAPI 和 Brave Search，合并结果以获取更全面的数据
+  const results: SerpApiResponse = {
+    organic_results: [],
+    related_questions: [],
+  };
 
-      const res = await fetch(url.toString(), {
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) return await res.json() as SerpApiResponse;
-    }
+  const tasks: Promise<void>[] = [];
 
-    // Brave Search 补充渠道
-    if (braveKey) {
-      const res = await fetch(
-        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(keyword)}&count=10`,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip',
-            'X-Subscription-Token': braveKey,
-          },
+  // SerpAPI (Google 搜索) - 获取更多结果以挖掘潜在客户
+  if (serpApiKey) {
+    tasks.push((async () => {
+      try {
+        const url = new URL('https://serpapi.com/search');
+        url.searchParams.set('q', keyword);
+        url.searchParams.set('api_key', serpApiKey);
+        url.searchParams.set('engine', 'google');
+        url.searchParams.set('hl', 'en');
+        url.searchParams.set('gl', 'us');
+        url.searchParams.set('num', '30'); // 增加到30条，最大化潜在客户挖掘
+
+        const res = await fetch(url.toString(), {
+          headers: { 'Accept': 'application/json' },
           signal: AbortSignal.timeout(8000),
-        }
-      );
-      if (!res.ok) return null;
-      const data = await res.json() as { web?: { results?: Array<{ title: string; url: string; description: string }> } };
-      return {
-        organic_results: (data.web?.results || []).map(r => ({
-          title: r.title,
-          link: r.url,
-          snippet: r.description,
-        })),
-      } as SerpApiResponse;
-    }
+        });
 
-    return null;
-  } catch {
-    return null;
+        if (res.ok) {
+          const data = await res.json() as SerpApiResponse;
+          if (data.organic_results?.length) {
+            // 标记来源，避免重复
+            results.organic_results!.push(
+              ...data.organic_results.map(r => ({ ...r, source: 'google' as const }))
+            );
+          }
+          if (data.related_questions?.length) {
+            results.related_questions!.push(...data.related_questions);
+          }
+          if (data.answer_box) {
+            results.answer_box = data.answer_box;
+          }
+        }
+      } catch (e) {
+        console.warn('[fetchSerpData] SerpAPI failed:', e);
+      }
+    })());
   }
+
+  // Brave Search
+  if (braveKey) {
+    tasks.push((async () => {
+      try {
+        const res = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(keyword)}&count=20`, // Brave免费版最大20条
+          {
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip',
+              'X-Subscription-Token': braveKey,
+            },
+            signal: AbortSignal.timeout(8000),
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json() as { web?: { results?: Array<{ title: string; url: string; description: string }> } };
+          if (data.web?.results?.length) {
+            // 转换 Brave 格式为 SerpAPI 格式，标记来源
+            const braveResults = data.web.results.map(r => ({
+              title: r.title,
+              link: r.url,
+              snippet: r.description,
+              source: 'brave' as const,
+            }));
+
+            // 去重：排除与已有结果 URL 相同的
+            const existingUrls = new Set(results.organic_results?.map(r => r.link) || []);
+            const newResults = braveResults.filter(r => !existingUrls.has(r.link));
+
+            results.organic_results!.push(...newResults);
+          }
+        }
+      } catch (e) {
+        console.warn('[fetchSerpData] Brave Search failed:', e);
+      }
+    })());
+  }
+
+  // 并发执行所有搜索
+  await Promise.allSettled(tasks);
+
+  // 去重并排序（按来源优先级：google > brave）
+  if (results.organic_results && results.organic_results.length > 0) {
+    const seen = new Set<string>();
+    results.organic_results = results.organic_results.filter(r => {
+      if (!r.link) return false;
+      if (seen.has(r.link)) return false;
+      seen.add(r.link);
+      return true;
+    });
+
+    // 按来源排序：Google 结果优先
+    results.organic_results.sort((a, b) => {
+      const aScore = a.source === 'google' ? 0 : 1;
+      const bScore = b.source === 'google' ? 0 : 1;
+      return aScore - bScore;
+    });
+  }
+
+  // 去重 PAA 问题
+  if (results.related_questions && results.related_questions.length > 0) {
+    const seenQ = new Set<string>();
+    results.related_questions = results.related_questions.filter(q => {
+      if (!q.question) return false;
+      if (seenQ.has(q.question.toLowerCase())) return false;
+      seenQ.add(q.question.toLowerCase());
+      return true;
+    });
+  }
+
+  return results.organic_results?.length ? results : null;
 }
 
 const STEP2_PROMPT = `You are a senior SEO strategist. Analyze the following SERP data and keyword context to select a content framework and identify gaps.
@@ -562,6 +646,75 @@ export async function step4FinalOutput(
 }
 
 // ============================================================
+// Quality Check
+// ============================================================
+
+function runQualityCheck(pkg: ContentPackage, article: string): QualityCheckResult {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+
+  // 1. Primary keyword placement
+  const h1Match = article.match(/^#\s+.+/m);
+  if (!h1Match || !h1Match[0].toLowerCase().includes(pkg.primaryKeyword.toLowerCase())) {
+    issues.push(`Primary keyword "${pkg.primaryKeyword}" missing from H1`);
+  }
+
+  // Check first 150 words for keyword
+  const first150Words = article.split(/\s+/).slice(0, 150).join(' ').toLowerCase();
+  if (!first150Words.includes(pkg.primaryKeyword.toLowerCase())) {
+    issues.push(`Primary keyword "${pkg.primaryKeyword}" missing from first 150 words`);
+  }
+
+  // 2. Meta description length
+  if (pkg.metaDescription.length > 160) {
+    warnings.push(`Meta description too long (${pkg.metaDescription.length} chars, max 160)`);
+  }
+  if (pkg.metaDescription.length < 120) {
+    warnings.push(`Meta description too short (${pkg.metaDescription.length} chars, min 120)`);
+  }
+
+  // 3. Title length
+  if (pkg.metaTitle.length > 60) {
+    warnings.push(`Title too long (${pkg.metaTitle.length} chars, max 60)`);
+  }
+
+  // 4. Word count
+  if (pkg.wordCount < 1200) {
+    warnings.push(`Article too short (${pkg.wordCount} words, target 1500-2000)`);
+  }
+
+  // 5. TL;DR check
+  if (!article.includes('TL;DR') && !article.includes('Key Takeaways') && !article.includes('Quick Summary')) {
+    warnings.push('Missing TL;DR or Key Takeaways section');
+  }
+
+  // 6. Banned words check
+  const articleLower = article.toLowerCase();
+  for (const word of BANNED_WORDS) {
+    if (articleLower.includes(word.toLowerCase())) {
+      issues.push(`Banned word "${word}" found in article`);
+    }
+  }
+
+  // 7. FAQ section check
+  if (!article.includes('## Frequently Asked') && !article.includes('## FAQ')) {
+    warnings.push('Missing FAQ section');
+  }
+
+  // 8. GEO version length
+  const geoWordCount = pkg.geoVersion.split(/\s+/).filter(Boolean).length;
+  if (geoWordCount < 250 || geoWordCount > 600) {
+    warnings.push(`GEO version length ${geoWordCount} words (target 300-500)`);
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues,
+    warnings,
+  };
+}
+
+// ============================================================
 // Main Pipeline: runSeoGeoPipeline
 // ============================================================
 
@@ -587,9 +740,8 @@ export async function runSeoGeoPipeline(ctx: PipelineContext): Promise<ContentPa
   // Calculate word count
   const wordCount = article.split(/\s+/).filter(Boolean).length;
 
-  console.log(`[seo-geo-pipeline] Done. Word count: ${wordCount}, Framework: ${serp.selectedFramework}`);
-
-  return {
+  // Build result
+  const result: ContentPackage = {
     metaTitle: blocks.metaTitle,
     metaDescription: blocks.metaDescription,
     slug: blocks.slug,
@@ -603,5 +755,21 @@ export async function runSeoGeoPipeline(ctx: PipelineContext): Promise<ContentPa
     keywordMatrix: matrix,
     serpAnalysis: serp,
     wordCount,
+    qualityCheck: undefined, // Will be set after quality check
   };
+
+  // Quality Check
+  const quality = runQualityCheck(result, article);
+  result.qualityCheck = quality;
+
+  if (!quality.passed) {
+    console.warn('[seo-geo-pipeline] Quality issues:', quality.issues);
+  }
+  if (quality.warnings.length > 0) {
+    console.log('[seo-geo-pipeline] Quality warnings:', quality.warnings);
+  }
+
+  console.log(`[seo-geo-pipeline] Done. Word count: ${wordCount}, Framework: ${serp.selectedFramework}, Quality: ${quality.passed ? 'PASSED' : 'ISSUES'}`);
+
+  return result;
 }

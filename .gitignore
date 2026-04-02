@@ -69,3 +69,8 @@ shipyard-xevora/
 POD-Dreamworks/
 -/
 .env*.local
+
+# Vercel env files (contain secrets)
+.env.vercel
+.env.vercel-prod
+

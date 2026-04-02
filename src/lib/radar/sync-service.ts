@@ -209,13 +209,46 @@ export async function runRadarTask(taskId: string): Promise<SyncResult> {
 
 // ==================== 处理单个候选 ====================
 
+/**
+ * 规范化网站域名用于跨源去重
+ * 例如: "https://www.example.com/path" -> "example.com"
+ */
+function normalizeDomain(website: string | null | undefined): string | null {
+  if (!website) return null;
+  try {
+    const url = new URL(website.startsWith('http') ? website : `https://${website}`);
+    let domain = url.hostname.toLowerCase();
+    // 移除 www. 前缀
+    if (domain.startsWith('www.')) {
+      domain = domain.slice(4);
+    }
+    return domain;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 规范化公司名称用于跨源去重
+ * 移除常见后缀: Inc., LLC, Ltd., Corp., Co., etc.
+ */
+function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\b(inc\.?|llc|ltd\.?|corp\.?|co\.?|gmbh|s\.?a\.?|ag|bv|nv|pty)\b$/i, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function processCandidate(
   task: RadarTask & { source: RadarSource },
   item: NormalizedCandidate,
   stats: { created: number; duplicates: number; errors: string[] }
 ): Promise<void> {
-  // 检查是否已存在
-  const existing = await prisma.radarCandidate.findUnique({
+  // 1. 检查是否已存在（同源同ID）
+  const existingByExternalId = await prisma.radarCandidate.findUnique({
     where: {
       sourceId_externalId: {
         sourceId: task.sourceId,
@@ -224,9 +257,40 @@ async function processCandidate(
     },
   });
 
-  if (existing) {
+  if (existingByExternalId) {
     stats.duplicates++;
     return;
+  }
+
+  // 2. 跨源去重：基于网站域名
+  const normalizedDomain = normalizeDomain(item.website);
+  if (normalizedDomain) {
+    const existingByWebsite = await prisma.radarCandidate.findFirst({
+      where: {
+        tenantId: task.tenantId,
+        website: { contains: normalizedDomain, mode: 'insensitive' },
+      },
+    });
+    if (existingByWebsite) {
+      stats.duplicates++;
+      return;
+    }
+  }
+
+  // 3. 跨源去重：基于公司名称 + 国家（针对没有网站的公司）
+  if (!normalizedDomain && item.displayName) {
+    const normalizedName = normalizeCompanyName(item.displayName);
+    const existingByName = await prisma.radarCandidate.findFirst({
+      where: {
+        tenantId: task.tenantId,
+        displayName: { contains: normalizedName, mode: 'insensitive' },
+        country: item.country || null,
+      },
+    });
+    if (existingByName) {
+      stats.duplicates++;
+      return;
+    }
   }
 
   // 计算过期时间
@@ -245,7 +309,7 @@ async function processCandidate(
       sourceUrl: item.sourceUrl,
       displayName: item.displayName,
       description: item.description,
-      
+
       // 公司字段
       website: item.website,
       phone: item.phone,
@@ -255,7 +319,7 @@ async function processCandidate(
       city: item.city,
       industry: item.industry,
       companySize: item.companySize,
-      
+
       // 机会字段
       deadline: item.deadline,
       estimatedValue: item.estimatedValue,
@@ -265,14 +329,14 @@ async function processCandidate(
       buyerType: item.buyerType,
       categoryCode: item.categoryCode,
       categoryName: item.categoryName,
-      
+
       // 匹配信息
       matchExplain: item.matchExplain as object,
-      
+
       // TTL 策略
       rawData: task.source.storagePolicy !== 'ID_ONLY' ? item.rawData as object : undefined,
       expireAt,
-      
+
       status: 'NEW',
     },
   });

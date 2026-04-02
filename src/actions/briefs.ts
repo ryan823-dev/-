@@ -245,27 +245,29 @@ export async function deleteBrief(id: string): Promise<void> {
 
 // ==================== AI: Generate Brief from Persona ====================
 
-const BRIEF_GENERATION_PROMPT = `你是 B2B 内容策略专家。根据给定的买家角色信息，为其生成一份内容 Brief（内容规划）。
+const BRIEF_GENERATION_PROMPT = `You are a B2B content strategy expert for Chinese manufacturers targeting GLOBAL BUYERS (overseas customer acquisition).
 
-买家角色信息：
-- 名称：{personaName}
-- 职位：{personaTitle}
-- 核心关注：{concerns}
+Buyer persona info:
+- Name: {personaName}
+- Title: {personaTitle}
+- Core concerns: {concerns}
 
-请生成一份针对此买家角色的内容规划，JSON 格式输出：
+Generate a content brief targeting this buyer persona. Output MUST be in ENGLISH (for global B2B buyers). JSON format:
 
 {
-  "title": "内容标题（≤30字）",
-  "targetKeywords": ["主关键词", "相关关键词1", "相关关键词2"],
+  "title": "English title (≤50 chars, SEO-friendly for global search)",
+  "targetKeywords": ["primary English keyword", "related keyword 1", "related keyword 2"],
   "intent": "informational|commercial|transactional|navigational",
-  "cta": "行动号召（≤20字）",
-  "notes": "内容方向说明（≤100字）"
+  "cta": "Call-to-action in English (≤30 chars)",
+  "notes": "Content direction notes in English (≤150 chars)"
 }
 
-注意：
-- 只输出 JSON，不要额外文字
-- intent 说明：informational=信息查询，commercial=商业调研，transactional=交易决策，navigational=品牌导航
-- 内容应针对 B2B 专业场景`;
+Rules:
+- ALL output MUST be in English (this is for overseas customer acquisition)
+- Keywords should be terms global buyers would search on Google/LinkedIn
+- Title should be compelling for international B2B buyers
+- intent: informational=research, commercial=evaluation, transactional=purchase decision, navigational=brand search
+- Output ONLY valid JSON, no other text`;
 
 export async function generateBriefFromPersona(personaId: string): Promise<BriefListItem> {
   const session = await getSession();
@@ -303,11 +305,11 @@ export async function generateBriefFromPersona(personaId: string): Promise<Brief
   } catch (error) {
     console.warn('[createBriefFromPersona] JSON parse failed, using default:', error);
     parsed = {
-      title: `为${persona.title}打造的专业内容`,
-      targetKeywords: [`${persona.name}解决方案`],
+      title: `Professional Solutions for ${persona.title}`,
+      targetKeywords: [`${persona.name} solution`, `B2B ${persona.title.toLowerCase()}`],
       intent: "informational",
-      cta: "了解更多",
-      notes: `针对${persona.title}角色的内容规划`,
+      cta: "Learn More",
+      notes: `Content strategy targeting ${persona.title} buyer persona for global market`,
     };
   }
 
