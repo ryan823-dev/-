@@ -23,7 +23,6 @@
     "ali-oss": "^6.21.0",
     "uuid": "^9.0.1",
     "pino-pretty": "^11.0.0",
-    "node-pptx-parser": "^1.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

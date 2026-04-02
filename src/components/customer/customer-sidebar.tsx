@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, Menu, X } from 'lucide-react';
 import {
   getSortedGroups,
   getNavItemsByGroup,
@@ -37,26 +37,6 @@ interface CustomerSidebarProps {
 
 const STORAGE_KEY = 'vertax-nav-expanded';
 
-// 初始化展开状态的辅助函数
-function getInitialExpandedNav(pathname: string | null): string | null {
-  if (typeof window === 'undefined') return null;
-
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return stored;
-
-  // 自动展开当前路由所属的一级
-  const itemsByGroup = getNavItemsByGroup();
-  for (const groupKey of Object.keys(itemsByGroup) as NavGroupKey[]) {
-    const items = itemsByGroup[groupKey];
-    for (const item of items) {
-      if (pathname?.startsWith(item.href)) {
-        return item.key;
-      }
-    }
-  }
-  return null;
-}
-
 // ============================================
 // 主组件
 // ============================================
@@ -68,16 +48,38 @@ export function CustomerSidebar({
   healthData = {},
 }: CustomerSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // 获取配置数据
   const groups = getSortedGroups();
   const itemsByGroup = getNavItemsByGroup();
 
-  // 使用函数初始化状态，避免在 useEffect 中调用 setState
-  const [expandedNav, setExpandedNav] = useState<string | null>(() =>
-    getInitialExpandedNav(pathname)
-  );
+  // SSR-safe: always start as null, then hydrate from localStorage
+  const [expandedNav, setExpandedNav] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setExpandedNav(stored);
+      return;
+    }
+    // Auto-expand group matching current route
+    const groups = getNavItemsByGroup();
+    for (const groupKey of Object.keys(groups) as NavGroupKey[]) {
+      for (const item of groups[groupKey]) {
+        if (pathname?.startsWith(item.href)) {
+          setExpandedNav(item.key);
+          return;
+        }
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 保存展开状态到 localStorage
   const toggleExpand = (key: string) => {
@@ -108,12 +110,43 @@ export function CustomerSidebar({
   };
 
   return (
-    <aside 
-      className={`${collapsed ? 'w-[72px]' : 'w-60'} flex flex-col h-screen sticky top-0 transition-all duration-300`}
-      style={{
-        background: 'linear-gradient(180deg, #0B1220 0%, #0A1018 100%)',
-      }}
-    >
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-3 left-3 z-50 lg:hidden p-2 rounded-lg text-white"
+        style={{ background: 'rgba(11,18,32,0.9)' }}
+        aria-label="打开导航菜单"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile overlay backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside 
+        className={`${collapsed ? 'w-[72px]' : 'w-60'} flex-col h-screen transition-all duration-300 hidden lg:flex lg:sticky lg:top-0 ${
+          mobileOpen ? '!flex fixed inset-y-0 left-0 z-50' : ''
+        }`}
+        style={{
+          background: 'linear-gradient(180deg, #0B1220 0%, #0A1018 100%)',
+        }}
+      >
+        {/* Mobile close button */}
+        {mobileOpen && (
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="absolute top-4 right-3 z-10 p-1.5 text-[rgba(255,255,255,0.5)] hover:text-white transition-colors lg:hidden"
+            aria-label="关闭导航菜单"
+          >
+            <X size={18} />
+          </button>
+        )}
       {/* Brand Header - 高端会所风格 */}
       <div className={`${collapsed ? 'px-4 py-6' : 'px-5 py-6'} border-b border-[rgba(255,255,255,0.06)]`}>
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -123,7 +156,7 @@ export function CustomerSidebar({
           {!collapsed && (
             <div className="overflow-hidden">
               <h1 className="text-sm font-bold text-white tracking-tight truncate">{tenantName}</h1>
-              <p className="text-[9px] text-gold font-bold uppercase tracking-widest opacity-80">GROWTH CHAMBER V0.2</p>
+              <p className="text-[9px] text-gold font-bold uppercase tracking-widest opacity-80">GROWTH CHAMBER</p>
             </div>
           )}
         </div>
@@ -185,12 +218,14 @@ export function CustomerSidebar({
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center py-2 text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.03)]"
+          className="w-full flex items-center justify-center py-2.5 text-[rgba(255,255,255,0.4)] hover:text-[rgba(255,255,255,0.7)] transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.03)]"
+          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
         >
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       </div>
     </aside>
+    </>
   );
 }
 
@@ -282,7 +317,8 @@ function NavItemRow({
         {hasSubItems && !collapsed && (
           <button
             onClick={onToggleExpand}
-            className="p-1.5 text-[rgba(255,255,255,0.35)] hover:text-[rgba(255,255,255,0.6)] transition-colors rounded"
+            className="p-2 min-w-[28px] min-h-[28px] flex items-center justify-center text-[rgba(255,255,255,0.35)] hover:text-[rgba(255,255,255,0.6)] transition-colors rounded"
+            aria-label={isExpanded ? `收起${item.label}子菜单` : `展开${item.label}子菜单`}
           >
             <ChevronDown
               size={14}

@@ -16,7 +16,7 @@ export default function CustomerLayout({
   return (
     <div className="customer-theme flex min-h-screen bg-[#F7F3EA] text-[#111827]">
       <CustomerSidebar tenantName={tenantName} tenantSlug={tenantSlug} />
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <CustomerHeader
           tenantName={tenantName}
           tenantSlug={tenantSlug}

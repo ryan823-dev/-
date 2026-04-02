@@ -35,11 +35,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`[analyze-assets] execPath=${process.execPath}, cwd=${process.cwd()}, node=${process.version}`);
+    console.log(`[analyze-assets] step 1: query assets, ids=${assetIds.length}`);
+
     // 优先使用已解析的 AssetChunk（避免重复 OSS 下载+解析），回退到原始提取
     const assets = await db.asset.findMany({
       where: { id: { in: assetIds }, tenantId, status: "active" },
       select: { id: true, originalName: true, storageKey: true, mimeType: true },
     });
+
+    console.log(`[analyze-assets] step 2: found ${assets.length} assets`);
 
     if (assets.length === 0) {
       return NextResponse.json({ error: "未找到可分析的素材" }, { status: 400 });
@@ -51,6 +56,8 @@ export async function POST(request: NextRequest) {
       orderBy: [{ assetId: "asc" }, { chunkIndex: "asc" }],
       select: { assetId: true, content: true },
     });
+
+    console.log(`[analyze-assets] step 3: found ${chunks.length} chunks`);
 
     const textResults: string[] = [];
 
@@ -99,8 +106,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`[analyze-assets] Sending ${textResults.length} texts (total ${textResults.join('').length} chars) to AI...`);
+
     // 调用 AI 分析
     const { analysis, model } = await analyzeCompanyProfile(textResults);
+
+    console.log(`[analyze-assets] AI analysis completed, model: ${model}`);
 
     // 保存/更新企业画像
     const profile = await db.companyProfile.upsert({

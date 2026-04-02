@@ -5,7 +5,7 @@ import { resolveTenant } from "@/lib/tenant-resolver";
 
 const { auth } = NextAuth(authConfig);
 
-const publicPaths = ["/login", "/register", "/api/auth"];
+const publicPaths = ["/login", "/register", "/api/auth", "/api/inquiry"];
 
 const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -67,7 +67,7 @@ export default auth((req) => {
 
   // If authenticated and on login/register, redirect to dashboard
   if (req.auth && (pathname === "/login" || pathname === "/register")) {
-    const targetPath = isCustomerView ? "/customer/home" : "/dashboard";
+    const targetPath = isCustomerView ? "/customer/home" : "/tower";
     return NextResponse.redirect(createRedirectUrl(targetPath));
   }
 

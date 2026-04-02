@@ -89,9 +89,9 @@ export function NotificationBell({ tenantId }: { tenantId?: string }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative flex items-center justify-center w-8 h-8 rounded-lg transition-all hover:bg-white/5"
+        className="relative flex items-center justify-center w-9 h-9 rounded-lg transition-all hover:bg-white/5"
         style={{ color: "rgba(255,255,255,0.55)" }}
-        title="通知"
+        aria-label={unread > 0 ? `通知 (${unread}条未读)` : '通知'}
       >
         <Bell size={16} />
         {unread > 0 && (
@@ -134,6 +134,7 @@ export function NotificationBell({ tenantId }: { tenantId?: string }) {
               <button
                 onClick={handleMarkAll}
                 className="flex items-center gap-1 text-[10px] transition-colors"
+                aria-label="标记全部已读"
                 style={{ color: "rgba(255,255,255,0.35)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#D4AF37")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.35)")}

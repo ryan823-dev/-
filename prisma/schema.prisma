@@ -1722,3 +1722,21 @@ model AssetProcessQueue {
   @@index([tenantId, status])
   @@map("asset_process_queue")
 }
+
+// 商务咨询留言（来自登录页"获取使用资格"入口）
+model Inquiry {
+  id        String   @id @default(cuid())
+  name      String
+  company   String
+  email     String
+  phone     String?
+  message   String?
+  status    String   @default("new") // new | read | handled
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("inquiries")
+}

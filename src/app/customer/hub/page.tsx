@@ -96,7 +96,12 @@ export default function HubPage() {
       setComments(commentsData);
       setCollabStats(collabStatsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
+      const msg = err instanceof Error ? err.message : '加载数据失败';
+      setError(
+        msg === 'Unauthorized' ? '会话已过期，请重新登录后再试'
+        : msg === 'Forbidden' ? '您没有权限访问此页面'
+        : msg
+      );
     } finally {
       setIsLoading(false);
     }

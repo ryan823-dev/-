@@ -112,8 +112,9 @@ export default function LoginPage() {
       if (isExternalRedirect) {
         await handleCrossDomainRedirect();
       } else {
-        // 始终跳转到 /customer/home (当前系统主界面)
-        window.location.href = '/customer/home';
+        // Detect tower subdomain to route to admin dashboard
+        const isTower = window.location.hostname.startsWith('tower.');
+        window.location.href = isTower ? '/tower' : '/customer/home';
       }
     }
   }
@@ -264,11 +265,11 @@ export default function LoginPage() {
           <p className="text-center mt-6 text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
             还没有账户？{' '}
             <Link
-              href="/zh-CN/register"
+              href="/register"
               className="font-medium hover:underline"
               style={{ color: '#D4AF37' }}
             >
-              注册
+              获取使用资格
             </Link>
           </p>
         </div>

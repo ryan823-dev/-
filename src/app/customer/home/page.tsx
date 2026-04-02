@@ -193,7 +193,7 @@ export default function CEOCockpitPage() {
                       <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
                         <div className="flex items-center gap-1.5">
                           <span className="text-dark-secondary text-sm font-medium">关键成果</span>
-                          <span className="badge-gold text-[9px] py-0.5 px-1.5">V0.2</span>
+                          <span className="badge-gold text-[9px] py-0.5 px-1.5">AI</span>
                         </div>
                         <div className="space-y-2">
                           {briefing?.highlights?.slice(0, 3).map((item, idx) => (

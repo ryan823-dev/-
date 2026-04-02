@@ -30,8 +30,8 @@ function getOSSClient(): OSS {
       accessKeyId: OSS_ACCESS_KEY_ID!,
       accessKeySecret: OSS_ACCESS_KEY_SECRET!,
       bucket: OSS_BUCKET!,
-      // endpoint 不传，只用 region，避免 ali-oss 与 endpoint 格式冲突
-      secure: true,
+      ...(OSS_ENDPOINT ? { endpoint: OSS_ENDPOINT } : {}),
+      secure: !OSS_ENDPOINT?.startsWith('http://'),
     });
   }
   return ossClient;

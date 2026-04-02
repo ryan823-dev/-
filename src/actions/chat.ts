@@ -326,12 +326,4 @@ export async function sendMessage(
 }
 
 // ==================== Quick Questions ====================
-
-export const QUICK_QUESTIONS = [
-  "本周营销进展如何？",
-  "有哪些高优先级任务需要关注？",
-  "目标客户画像是什么？",
-  "最近收集了哪些客户证据？",
-  "内容规划的完成情况？",
-  "下一步应该做什么？",
-];
+// 注意：常量必须放在非 "use server" 文件中导出

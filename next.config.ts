@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["undici"],
   typescript: {
     // !! 警告 !!
     // 临时跳过 TypeScript 构建错误，以便快速部署
