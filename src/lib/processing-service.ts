@@ -3,12 +3,13 @@
  * 
  * 根据文件类型和大小选择合适的处理方式：
  * - 小文件 (<8MB): 浏览器端处理
- * - 大文件音视频: AssemblyAI
- * - 大文件文档: Azure Document Intelligence
+ * - 大文件音视频: AssemblyAI (需要对话内容)
+ * - 大文件文档: 独立微服务 (Railway 部署)
+ * - 图片文件: 微服务 OCR
  * - 其他: 服务端本地处理
  */
 
-export type ProcessorType = 'browser' | 'assemblyai' | 'azure-ocr' | 'server';
+export type ProcessorType = 'browser' | 'assemblyai' | 'microservice' | 'server';
 
 export interface ProcessingDecision {
   processor: ProcessorType;
@@ -37,11 +38,16 @@ const AUDIO_VIDEO_TYPES = new Set([
   'video/x-msvideo', 'video/x-ms-wmv',
 ]);
 
-// 文档 MIME 类型（Azure OCR）
-const DOCUMENT_TYPES = new Set([
+// 图片 MIME 类型（微服务 OCR）
+const IMAGE_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/jpg', 'image/tiff', 'image/bmp', 'image/webp',
+]);
+
+// 文档 MIME 类型（微服务处理）
+const LARGE_DOCUMENT_TYPES = new Set([
   'application/pdf',
-  'image/png', 'image/jpeg', 'image/jpg', 'image/tiff', 'image/bmp',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
@@ -55,8 +61,10 @@ export function decideProcessor(
 ): ProcessingDecision {
   const isSmall = fileSize < BROWSER_THRESHOLD_BYTES;
   const isAudioVideo = AUDIO_VIDEO_TYPES.has(mimeType);
-  const isDocument = DOCUMENT_TYPES.has(mimeType);
+  const isImage = IMAGE_TYPES.has(mimeType);
+  const isLargeDocument = LARGE_DOCUMENT_TYPES.has(mimeType) && !isSmall;
   const isBrowserSupported = BROWSER_SUPPORTED_TYPES.has(mimeType);
+  const hasMicroservice = !!process.env.PROCESSOR_SERVICE_URL;
 
   // 小文件 + 浏览器支持 → 浏览器端处理
   if (isSmall && isBrowserSupported) {
@@ -66,7 +74,16 @@ export function decideProcessor(
     };
   }
 
-  // 音视频文件 → AssemblyAI
+  // 图片文件 → 微服务 OCR
+  if (isImage && hasMicroservice) {
+    return {
+      processor: 'microservice',
+      reason: '图片文件，使用微服务 OCR',
+      apiEndpoint: '/api/processing/microservice',
+    };
+  }
+
+  // 音视频文件 → AssemblyAI (需要对话内容才有效)
   if (isAudioVideo) {
     const hasApiKey = !!process.env.ASSEMBLYAI_API_KEY;
     if (hasApiKey) {
@@ -83,30 +100,19 @@ export function decideProcessor(
     };
   }
 
-  // 大文件文档 → Azure OCR
-  if (!isSmall && isDocument) {
-    const hasAzure = !!(
-      process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT &&
-      process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY
-    );
-    if (hasAzure) {
-      return {
-        processor: 'azure-ocr',
-        reason: '大文件文档，使用 Azure OCR',
-        apiEndpoint: '/api/processing/azure-ocr',
-      };
-    }
-    // 没有 Azure，尝试服务端处理
+  // 大文件文档 → 微服务处理
+  if (isLargeDocument && hasMicroservice) {
     return {
-      processor: 'server',
-      reason: 'Azure OCR 未配置，使用服务端处理',
+      processor: 'microservice',
+      reason: '大文件文档，使用独立微服务处理',
+      apiEndpoint: '/api/processing/microservice',
     };
   }
 
   // 默认：服务端处理
   return {
     processor: 'server',
-    reason: '使用服务端处理',
+    reason: hasMicroservice ? '使用服务端处理' : '微服务未配置，使用本地处理',
   };
 }
 
@@ -119,8 +125,8 @@ export function getProcessingDescription(decision: ProcessingDecision): string {
       return '本地处理中...';
     case 'assemblyai':
       return 'AI 转录中（AssemblyAI）...';
-    case 'azure-ocr':
-      return '云端 OCR 处理中（Azure）...';
+    case 'microservice':
+      return '微服务处理中...';
     case 'server':
       return '服务器处理中...';
     default:
@@ -129,12 +135,13 @@ export function getProcessingDescription(decision: ProcessingDecision): string {
 }
 
 /**
- * 检查第三方 API 配置状态
+ * 检查第三方 API 和微服务配置状态
  */
 export function checkAPIConfiguration(): {
   assemblyai: { configured: boolean; reason?: string };
-  azure: { configured: boolean; reason?: string };
+  microservice: { configured: boolean; url?: string; reason?: string };
 } {
+  const microserviceUrl = process.env.PROCESSOR_SERVICE_URL;
   return {
     assemblyai: {
       configured: !!process.env.ASSEMBLYAI_API_KEY,
@@ -142,16 +149,26 @@ export function checkAPIConfiguration(): {
         ? undefined 
         : '未设置 ASSEMBLYAI_API_KEY',
     },
-    azure: {
-      configured: !!(
-        process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT &&
-        process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY
-      ),
-      reason: !process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
-        ? '未设置 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT'
-        : !process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY
-        ? '未设置 AZURE_DOCUMENT_INTELLIGENCE_KEY'
-        : undefined,
+    microservice: {
+      configured: !!microserviceUrl,
+      url: microserviceUrl,
+      reason: microserviceUrl 
+        ? undefined 
+        : '未设置 PROCESSOR_SERVICE_URL',
     },
   };
+}
+
+/**
+ * 获取微服务处理 URL
+ */
+export function getMicroserviceUrl(): string | null {
+  return process.env.PROCESSOR_SERVICE_URL || null;
+}
+
+/**
+ * 获取微服务 API Key
+ */
+export function getMicroserviceApiKey(): string | null {
+  return process.env.PROCESSOR_API_KEY || null;
 }

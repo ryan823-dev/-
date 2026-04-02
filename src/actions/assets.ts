@@ -18,6 +18,7 @@ import {
 import { extractTextFromAsset } from "@/lib/utils/text-extract";
 import { splitTextIntoChunks } from "@/lib/utils/chunk-utils";
 import { requireDecider } from "@/lib/permissions";
+import { decideProcessor, getMicroserviceUrl, getMicroserviceApiKey } from "@/lib/processing-service";
 import type {
   FileUploadInput,
   AssetUploadSession,
@@ -754,10 +755,11 @@ function parseProcessingMeta(metadata: unknown): AssetProcessingMeta {
 }
 
 /**
- * 触发资产文本处理：直接同步处理（简单可靠）
+ * 触发资产文本处理：智能选择处理方式
  *
- * 恢复原始实现方式：直接在函数内处理，同步等待结果
- * 这是最简单可靠的方案，避免后台队列的复杂性
+ * 根据文件大小和类型选择处理方式：
+ * - 小文件：本地同步处理
+ * - 大文件/图片：微服务处理（如果配置）
  */
 export async function triggerAssetProcessing(assetId: string): Promise<AssetProcessingMeta> {
   const session = await getSession();
@@ -774,15 +776,109 @@ export async function triggerAssetProcessing(assetId: string): Promise<AssetProc
     throw new Error("资产不存在或不可处理");
   }
 
-  // 更新状态为 processing
+  // 决定处理方式
+  const decision = decideProcessor(Number(asset.fileSize), asset.mimeType);
   const currentMeta = (asset.metadata || {}) as Record<string, unknown>;
+
+  // 更新状态为 processing
   await db.asset.update({
     where: { id: assetId },
     data: {
-      metadata: { ...currentMeta, processingStatus: 'processing', processingError: undefined },
+      metadata: {
+        ...currentMeta,
+        processingStatus: 'processing',
+        processor: decision.processor,
+        processingError: undefined,
+      },
     },
   });
 
+  // 如果是微服务处理，调用微服务 API
+  if (decision.processor === 'microservice') {
+    return await processWithMicroservice(asset, session.user.tenantId);
+  }
+
+  // 本地同步处理
+  return await processLocally(asset, session.user.tenantId);
+}
+
+/**
+ * 使用微服务处理资产
+ */
+async function processWithMicroservice(
+  asset: { id: string; storageKey: string; mimeType: string },
+  tenantId: string
+): Promise<AssetProcessingMeta> {
+  const microserviceUrl = getMicroserviceUrl();
+  const apiKey = getMicroserviceApiKey();
+
+  if (!microserviceUrl || !apiKey) {
+    throw new Error('微服务未配置，请设置 PROCESSOR_SERVICE_URL 和 PROCESSOR_API_KEY');
+  }
+
+  try {
+    const response = await fetch(`${microserviceUrl}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assetId: asset.id,
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType,
+        tenantId,
+        apiKey,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `微服务请求失败: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const completedAt = new Date().toISOString();
+
+    // 微服务已保存 chunks，更新本地状态
+    await db.asset.update({
+      where: { id: asset.id },
+      data: {
+        metadata: {
+          processingStatus: 'ready',
+          processor: 'microservice',
+          chunkCount: result.chunkCount,
+          processedAt: completedAt,
+          textLength: result.textLength,
+        },
+      },
+    });
+
+    return {
+      processingStatus: 'ready',
+      chunkCount: result.chunkCount,
+      processedAt: completedAt,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '微服务处理失败';
+    await db.asset.update({
+      where: { id: asset.id },
+      data: {
+        metadata: {
+          processingStatus: 'failed',
+          processor: 'microservice',
+          processingError: errorMessage,
+        },
+      },
+    });
+    throw error;
+  }
+}
+
+/**
+ * 本地同步处理资产
+ */
+async function processLocally(
+  asset: { id: string; storageKey: string; mimeType: string },
+  tenantId: string
+): Promise<AssetProcessingMeta> {
   try {
     // 提取文本
     const text = await extractTextFromAsset(asset.storageKey, asset.mimeType);
@@ -800,14 +896,14 @@ export async function triggerAssetProcessing(assetId: string): Promise<AssetProc
 
     // 清除旧的 chunks（重新处理场景）
     await db.assetChunk.deleteMany({
-      where: { assetId },
+      where: { assetId: asset.id },
     });
 
     // 批量写入 AssetChunk
     await db.assetChunk.createMany({
       data: chunks.map((chunk) => ({
-        tenantId: session.user.tenantId,
-        assetId,
+        tenantId,
+        assetId: asset.id,
         content: chunk.content,
         chunkIndex: chunk.chunkIndex,
         charStart: chunk.charStart,
@@ -819,10 +915,11 @@ export async function triggerAssetProcessing(assetId: string): Promise<AssetProc
     // 更新状态为 ready
     const completedAt = new Date().toISOString();
     await db.asset.update({
-      where: { id: assetId },
+      where: { id: asset.id },
       data: {
         metadata: {
           processingStatus: 'ready',
+          processor: 'server',
           chunkCount: chunks.length,
           processedAt: completedAt,
           textLength: text.length,
@@ -839,10 +936,11 @@ export async function triggerAssetProcessing(assetId: string): Promise<AssetProc
     // 更新状态为 failed
     const errorMessage = error instanceof Error ? error.message : '处理失败';
     await db.asset.update({
-      where: { id: assetId },
+      where: { id: asset.id },
       data: {
         metadata: {
           processingStatus: 'failed',
+          processor: 'server',
           processingError: errorMessage,
         },
       },

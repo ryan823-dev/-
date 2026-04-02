@@ -1,0 +1,11 @@
+# nixpacks configuration for Railway
+[phases.setup]
+
+[phases.install]
+cmds = ['npm install']
+
+[phases.build]
+cmds = ['npx prisma generate']
+
+[start]
+cmd = 'npm start'
