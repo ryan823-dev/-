@@ -38,6 +38,8 @@ import {
   MessageCircle,
   PhoneCall,
   History,
+  Download,
+  Link2 as LinkIcon,
 } from 'lucide-react';
 import {
   getProspectCompaniesV2,
@@ -47,6 +49,7 @@ import {
   deleteProspectContact,
   generateProspectDossier,
   getLatestProspectDossier,
+  enrichProspectCompanyAction,
   type ProspectCompanyData,
   type ProspectContactData,
   type CreateProspectContactInput,
@@ -60,15 +63,21 @@ import {
   sendOutreachDraft,
   recordManualOutreach,
   getCompanyOutreachHistory,
+  saveOutreachArtifacts,
+  getSavedOutreachArtifacts,
   type OutreachRecordItem,
   type OutreachStats,
   type OutreachDraft,
   type CompanyOutreachRecord,
 } from '@/actions/outreach-draft';
+import { suggestLinksForProspect } from '@/actions/radar-content-links';
+import { exportProspectsToCSV } from '@/actions/prospect-export';
 
 // ==================== 类型 ====================
 
 interface OutreachPackContent {
+  timestamp?: string;
+  version?: number;
   outreachPack: {
     forPersona: string;
     forTier: string;
@@ -141,6 +150,64 @@ export default function RadarProspectsPage() {
   const [showCallResultForm, setShowCallResultForm] = useState<string | null>(null);
   const [callResult, setCallResult] = useState<string>('');
 
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<{ count?: number; error?: string } | null>(null);
+
+  // Task #30: 营销内容建议
+  const [suggestedContents, setSuggestedContents] = useState<any[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await exportProspectsToCSV();
+      if (res.success && res.csvContent) {
+        const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', res.filename || 'prospects.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert(res.error || '导出失败');
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('导出出错，请检查网络或联系管理员');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleManualEnrich = async () => {
+    if (!selectedCompany) return;
+    setIsEnriching(true);
+    setEnrichResult(null);
+    try {
+      const res = await enrichProspectCompanyAction(selectedCompany.id);
+      if (res.success) {
+        setEnrichResult({ count: res.personCount });
+        // 刷新列表和联系人
+        loadData();
+        if (selectedCompany.id) {
+          const res = await getProspectContacts(selectedCompany.id);
+          setContacts(res as any);
+        }
+      } else {
+        setEnrichResult({ error: res.error });
+      }
+    } catch (err) {
+      setEnrichResult({ error: String(err) });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+
   // 加载数据
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -185,6 +252,30 @@ export default function RadarProspectsPage() {
     }
   }, [selectedCompany?.id, activeTab]);
 
+  // 加载外联历史与营销内容建议 (Task #30 & P4)
+  useEffect(() => {
+    if (selectedCompany && activeTab === 'outreach') {
+      const loadOutreachData = async () => {
+        setIsLoadingHistory(true);
+        setIsLoadingSuggestions(true);
+        try {
+          const [hist, suggestions] = await Promise.all([
+            getCompanyOutreachHistory(selectedCompany.id),
+            suggestLinksForProspect(selectedCompany.id)
+          ]);
+          setOutreachHistory(hist.records || []);
+          setSuggestedContents(suggestions || []);
+        } catch (err) {
+          console.error('Failed to load outreach data:', err);
+        } finally {
+          setIsLoadingHistory(false);
+          setIsLoadingSuggestions(false);
+        }
+      };
+      loadOutreachData();
+    }
+  }, [selectedCompany?.id, activeTab]);
+
   // 加载背调简报（懒加载）
   useEffect(() => {
     if (selectedCompany && activeTab === 'dossier') {
@@ -193,6 +284,18 @@ export default function RadarProspectsPage() {
         .catch(() => setDossierData(null));
     }
   }, [selectedCompany?.id, activeTab]);
+
+  // 加载已保存的外联包 (Task #130)
+  useEffect(() => {
+    if (selectedCompany && activeTab === 'outreach' && !outreachPack && !isGenerating) {
+      getSavedOutreachArtifacts(selectedCompany.id)
+        .then(res => {
+          if (res.success && res.artifacts) {
+            setOutreachPack(res.artifacts as unknown as OutreachPackContent);
+          }
+        });
+    }
+  }, [selectedCompany?.id, activeTab, outreachPack, isGenerating]);
 
   // 联系人 CRUD 操作
   const handleCreateContact = async () => {
@@ -321,7 +424,23 @@ export default function RadarProspectsPage() {
       );
       
       if (result.ok && result.output) {
-        setOutreachPack(result.output as unknown as OutreachPackContent);
+        const pack = result.output as unknown as OutreachPackContent;
+        const newEntry = { ...pack, timestamp: new Date().toISOString() };
+        setOutreachPack(newEntry);
+        
+        // Task #130: 持久化保存生成的工具包
+        await saveOutreachArtifacts(company.id, pack);
+
+        // Task #124: 更新本地状态以立即显示版本历史
+        setSelectedCompany((prev: any) => {
+          if (!prev || prev.id !== company.id) return prev;
+          const current = prev.outreachArtifacts || [];
+          const history = Array.isArray(current) ? current : [current];
+          return {
+            ...prev,
+            outreachArtifacts: [newEntry, ...history].slice(0, 10)
+          };
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成外联包失败');
@@ -461,6 +580,14 @@ export default function RadarProspectsPage() {
             <p className="text-sm text-slate-400 mt-1">管理已导入的潜在客户，生成个性化外联方案</p>
           </div>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={handleExport}
+              disabled={isExporting}
+              title="导出 CSV"
+              className={`p-2 rounded-lg transition-colors ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'text-slate-400 hover:text-[#D4AF37]'}`}
+            >
+              {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            </button>
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'text-slate-400 hover:text-[#D4AF37]'}`}
@@ -815,7 +942,15 @@ export default function RadarProspectsPage() {
                     key={company.id}
                     onClick={() => {
                       setSelectedCompany(isSelected ? null : company);
-                      setOutreachPack(null);
+                      // Task #124: 加载已保存的外联工具包
+                      const artifacts = company.outreachArtifacts;
+                      if (Array.isArray(artifacts) && artifacts.length > 0) {
+                        setOutreachPack(artifacts[0] as any); // Load latest
+                      } else if (artifacts && !Array.isArray(artifacts)) {
+                        setOutreachPack(artifacts as any); // Legacy support
+                      } else {
+                        setOutreachPack(null);
+                      }
                       setActiveTab('info');
                       setContacts([]);
                       setDossierData(null);
@@ -941,7 +1076,69 @@ export default function RadarProspectsPage() {
                         </span>
                       </div>
                     </div>
+                    {/* Task #137: Manual Enrichment Button */}
+                    <div className="flex flex-col items-end gap-2">
+                      <button
+                        onClick={handleManualEnrich}
+                        disabled={isEnriching}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          isEnriching 
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                            : 'bg-[#0B1220] text-[#D4AF37] hover:bg-[#1A2634]'
+                        }`}
+                      >
+                        {isEnriching ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={12} />
+                        )}
+                        {isEnriching ? '丰富化中...' : '深度丰富化'}
+                      </button>
+                      {enrichResult?.count !== undefined && (
+                        <span className="text-[10px] text-emerald-600 font-medium">
+                          ✨ 已发现 {enrichResult.count} 个联系人
+                        </span>
+                      )}
+                      {enrichResult?.error && (
+                        <span className="text-[10px] text-red-500 font-medium">
+                          ❌ {enrichResult.error}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Task #140: AI Matching Insights */}
+                  {(selectedCompany.matchReasons || (selectedCompany as any).approachAngle) && (
+                    <div className="mb-6 p-4 bg-[#0B1220] rounded-xl border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.05)]">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={14} className="text-[#D4AF37]" />
+                        <span className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">AI 匹配洞察</span>
+                      </div>
+                      
+                      {selectedCompany.matchReasons && Array.isArray(selectedCompany.matchReasons) && (selectedCompany.matchReasons.length > 0) && (
+                        <div className="space-y-2 mb-4">
+                          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">核心匹配理由:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(selectedCompany.matchReasons as string[]).map((reason, idx) => (
+                              <div key={idx} className="flex items-center gap-1.5 bg-[#D4AF37]/10 border border-[#D4AF37]/20 px-2 py-1 rounded-md">
+                                <Check size={10} className="text-[#D4AF37]" />
+                                <span className="text-xs text-slate-200">{reason}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(selectedCompany as any).approachAngle && (
+                        <div className="pt-3 border-t border-white/5">
+                          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight mb-1.5">建议切入点:</p>
+                          <p className="text-xs text-slate-300 leading-relaxed italic">
+                            "{(selectedCompany as any).approachAngle}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Info Grid */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1212,6 +1409,28 @@ export default function RadarProspectsPage() {
               {activeTab === 'outreach' && (
                 /* Outreach Tab */
                 <div className="space-y-4">
+                  {/* Task #124: Version Selector */}
+                  {Array.isArray(selectedCompany.outreachArtifacts) && (selectedCompany.outreachArtifacts as any[]).length > 1 && (
+                    <div className="flex items-center gap-2 mb-4 p-2 bg-[#D4AF37]/5 rounded-xl border border-[#D4AF37]/20">
+                      <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider ml-2">历史方案:</span>
+                      <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                        {(selectedCompany.outreachArtifacts as any[]).map((entry, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setOutreachPack(entry)}
+                            className={`px-2 py-1 rounded text-[10px] whitespace-nowrap transition-all ${
+                              outreachPack?.timestamp === entry.timestamp
+                                ? 'bg-[#D4AF37] text-[#0B1220] font-bold shadow-sm'
+                                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            }`}
+                          >
+                            版本 {entry.version || (selectedCompany.outreachArtifacts as any[]).length - idx} ({new Date(entry.timestamp).toLocaleDateString()})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {isGenerating ? (
                     <div className="relative rounded-2xl overflow-hidden p-12 text-center" style={{ background: 'linear-gradient(135deg, #0B1220 0%, #0A1018 60%, #0D1525 100%)', boxShadow: '0 8px 32px -8px rgba(0,0,0,0.45)' }}>
                       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 60% at 50% -20%, rgba(212,175,55,0.14) 0%, transparent 65%)' }} />
@@ -1482,6 +1701,70 @@ export default function RadarProspectsPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Task #30: Suggested Marketing Content */}
+                      <div className="bg-[#D4AF37]/5 rounded-2xl border border-[#D4AF37]/20 p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Target size={18} className="text-[#D4AF37]" />
+                          <h4 className="font-bold text-[#0B1B2B]">匹配营销内容</h4>
+                          <span className="text-[10px] text-[#D4AF37] font-medium border border-[#D4AF37]/30 px-1.5 py-0.5 rounded uppercase">
+                            AI 智能匹配
+                          </span>
+                        </div>
+                        
+                        {isLoadingSuggestions ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 size={16} className="text-[#D4AF37] animate-spin" />
+                          </div>
+                        ) : suggestedContents.length === 0 ? (
+                          <p className="text-xs text-slate-400 text-center py-4 italic">
+                            暂无高匹配度的营销文章，建议先在营销中心发布相关内容。
+                          </p>
+                        ) : (
+                          <div className="space-y-3">
+                            {suggestedContents.map((suggestion, idx) => (
+                              <div key={idx} className="bg-white rounded-xl border border-[#E8E0D0] p-4 group hover:border-[#D4AF37]/50 transition-all">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <h5 className="text-sm font-bold text-[#0B1B2B] mb-1 group-hover:text-[#D4AF37] transition-colors line-clamp-1">
+                                      {suggestion.title}
+                                    </h5>
+                                    <p className="text-[10px] text-slate-500 line-clamp-1">
+                                      {suggestion.reason}
+                                    </p>
+                                  </div>
+                                  <Link 
+                                    href={`/customer/marketing/contents/${suggestion.contentId}`}
+                                    className="p-1.5 text-slate-400 hover:text-[#D4AF37] transition-colors"
+                                    title="查看内容"
+                                  >
+                                    <ExternalLink size={14} />
+                                  </Link>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+                                  <div className="flex gap-1">
+                                    {suggestion.matchedKeywords.slice(0, 2).map((kw: string, kidx: number) => (
+                                      <span key={kidx} className="text-[9px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded">
+                                        #{kw}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <button 
+                                    onClick={() => handleCopy(`${process.env.NEXT_PUBLIC_APP_URL}/blog/${suggestion.slug}`, `content-link-${idx}`)}
+                                    className="text-[10px] font-bold text-[#D4AF37] flex items-center gap-1 hover:underline"
+                                  >
+                                    {copiedId === `content-link-${idx}` ? (
+                                      <><Check size={10} /> 已复制链接</>
+                                    ) : (
+                                      <><LinkIcon size={10} /> 复制文章链接</>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       {/* Outreach History */}
                       <div className="bg-[#F7F3E8] rounded-2xl border border-[#E8E0D0] p-6">

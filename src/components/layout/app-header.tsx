@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { usePathname } from "next/navigation";
+import { NotificationBell } from "./notification-bell";
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -71,6 +72,9 @@ export function AppHeader() {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+      <div className="ml-auto flex items-center gap-4">
+        <NotificationBell />
+      </div>
     </header>
   );
 }

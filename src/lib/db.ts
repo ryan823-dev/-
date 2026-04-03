@@ -15,7 +15,7 @@ function createPrismaClient() {
     max: 5,                          // 最大连接数（Vercel serverless 保持低值）
   });
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter } as any);
 }
 
 const _db = globalForPrisma.prisma ?? createPrismaClient();

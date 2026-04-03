@@ -127,17 +127,17 @@ export async function learnExclusionPattern(
     const merged: ExclusionRules = {
       ...existing,
       negativeKeywords: dedupe([
-        ...(existing.negativeKeywords || []),
         ...(pattern.negativeKeywords || []),
-      ], 50),
+        ...(existing.negativeKeywords || []),
+      ], 100), // 优先保留新规则，且上限放宽到 100
       excludedIndustries: dedupe([
-        ...(existing.excludedIndustries || []),
         ...(pattern.excludedIndustries || []),
-      ], 20),
+        ...(existing.excludedIndustries || []),
+      ], 50),
       excludedPatterns: dedupe([
-        ...(existing.excludedPatterns || []),
         ...(pattern.excludedPatterns || []),
-      ], 10),
+        ...(existing.excludedPatterns || []),
+      ], 30),
     };
 
     await prisma.radarSearchProfile.update({

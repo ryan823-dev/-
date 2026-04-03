@@ -259,3 +259,66 @@ export async function suggestLinksForCandidate(
 
   return scored;
 }
+
+// ==================== 自动匹配建议 (ProspectCompany 视角) ====================
+
+export async function suggestLinksForProspect(
+  prospectId: string,
+  limit = 5
+): Promise<{ contentId: string; title: string; slug: string; score: number; matchedKeywords: string[]; reason: string }[]> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.tenantId) return [];
+  const tenantId = session.user.tenantId;
+
+  const prospect = await prisma.prospectCompany.findUnique({
+    where: { id: prospectId, tenantId },
+    select: { 
+      name: true, 
+      industry: true, 
+      description: true, 
+      matchReasons: true, 
+      approachAngle: true 
+    },
+  });
+  if (!prospect) return [];
+
+  // 提取关键词
+  const matchReasons = (prospect.matchReasons as string[]) || [];
+  const prospectKeywords = [
+    ...matchReasons,
+    prospect.industry,
+    prospect.approachAngle,
+  ].filter(Boolean).map(k => k!.toLowerCase());
+
+  if (prospectKeywords.length === 0) return [];
+
+  // 找已发布内容
+  const contents = await prisma.seoContent.findMany({
+    where: { tenantId, status: "published", deletedAt: null },
+    select: { id: true, title: true, slug: true, keywords: true, metaDescription: true },
+    orderBy: { publishedAt: "desc" },
+    take: 50,
+  });
+
+  const scored = contents.map(c => {
+    const contentText = [
+      c.title,
+      c.keywords.join(' '),
+      c.metaDescription,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    const matched = prospectKeywords.filter(kw => contentText.includes(kw));
+    return {
+      contentId: c.id,
+      title: c.title,
+      slug: c.slug,
+      score: matched.length,
+      matchedKeywords: matched,
+      reason: matched.length > 0 ? `匹配关键词: ${matched.slice(0, 3).join(', ')}` : '潜在匹配'
+    };
+  }).filter(r => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  return scored;
+}

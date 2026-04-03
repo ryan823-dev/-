@@ -703,9 +703,28 @@ ${pkg.faqMarkdown}` : '');
         channels: defaultChannels,
         queryKeywords: [pkg.primaryKeyword, ...pkg.supportingKeywords.slice(0, 3)],
       });
+
+      // Task #133: Auto-publish to official site & register in llms.txt (Mock log)
+      const { pushContentToWebsite } = await import("./publishing");
+      const pushRes = await pushContentToWebsite(seoContent.id);
+      
+      if (pushRes.success) {
+        logActivity({
+          tenantId: session.user.tenantId,
+          userId: session.user.id,
+          action: "content.geo_auto_published",
+          entityType: "SeoContent",
+          entityId: seoContent.id,
+          eventCategory: EVENT_CATEGORIES.MARKETING,
+          context: { 
+            message: "Content published and registered in remote llms.txt",
+            pushRecordId: pushRes.pushRecordId 
+          },
+        });
+      }
     } catch (err) {
       // Non-fatal: log but don't fail the pipeline
-      console.warn('[seo-geo-pipeline] Auto-register GEO distribution failed:', err);
+      console.warn('[seo-geo-pipeline] Auto-register/publish GEO distribution failed:', err);
     }
   }
 

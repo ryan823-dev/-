@@ -45,6 +45,7 @@ import {
   Shield,
   MessageSquare,
   Copy,
+  Trash2,
 } from 'lucide-react';
 import {
   getCandidatesV2,
@@ -136,6 +137,11 @@ export default function RadarCandidatesPage() {
   // 手动丰富化状态（P3）
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichDone, setEnrichDone] = useState(false);
+
+  // Task #125: 排除反馈学习
+  const [showExclusionModal, setShowExclusionModal] = useState<string | null>(null);
+  const [exclusionReason, setExclusionReason] = useState('');
+  const [isExcluding, setIsExcluding] = useState(false);
   
   // 从 URL 参数初始化筛选条件
   const initialStatus = searchParams.get('status') as CandidateStatus | null;
@@ -189,6 +195,10 @@ export default function RadarCandidatesPage() {
 
   // 合格化
   const handleQualify = async (candidateId: string, tier: 'A' | 'B' | 'C' | 'excluded') => {
+    if (tier === 'excluded') {
+      setShowExclusionModal(candidateId);
+      return;
+    }
     try {
       await qualifyCandidateV2(candidateId, tier);
       loadData(true);
@@ -197,6 +207,24 @@ export default function RadarCandidatesPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
+    }
+  };
+
+  const confirmExclusion = async () => {
+    if (!showExclusionModal) return;
+    setIsExcluding(true);
+    try {
+      await qualifyCandidateV2(showExclusionModal, 'excluded', exclusionReason);
+      setShowExclusionModal(null);
+      setExclusionReason('');
+      loadData(true);
+      if (selectedCandidate?.id === showExclusionModal) {
+        setSelectedCandidate(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '排除失败');
+    } finally {
+      setIsExcluding(false);
     }
   };
 
@@ -1653,6 +1681,71 @@ export default function RadarCandidatesPage() {
           </div>
         </div>
       </div>
+
+      {/* Exclusion Reason Modal (Task #125) */}
+      {showExclusionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-[#E8E0D0] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-8">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mb-6">
+                <Trash2 size={32} className="text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-[#0B1B2B] mb-2">确认排除该候选？</h3>
+              <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                排除后，AI 将学习您的反馈，逐步优化推荐逻辑，减少此类“非目标”候选的出现。
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">排除原因 (将用于 AI 学习)</label>
+                  <select 
+                    value={exclusionReason.startsWith('其他: ') ? '其他' : exclusionReason}
+                    onChange={(e) => setExclusionReason(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#F7F3E8] border border-[#E8E0D0] rounded-xl text-sm focus:outline-none focus:border-[#D4AF37] appearance-none"
+                  >
+                    <option value="">-- 请选择原因 (可选) --</option>
+                    <option value="行业不匹配">行业不匹配 (Wrong Industry)</option>
+                    <option value="规模太小/个人">规模太小/个人 (Too Small/Individual)</option>
+                    <option value="竞争对手">竞争对手 (Competitor)</option>
+                    <option value="中间商/代理商">中间商/代理商 (Distributor/Agent)</option>
+                    <option value="无出海需求">无出海需求 (No Overseas Demand)</option>
+                    <option value="其他">其他 (Other)</option>
+                  </select>
+                </div>
+
+                {(exclusionReason === '其他' || exclusionReason.startsWith('其他: ')) && (
+                  <textarea
+                    placeholder="请输入具体原因，帮助 AI 更好理解您的需求..."
+                    rows={3}
+                    defaultValue={exclusionReason.startsWith('其他: ') ? exclusionReason.replace('其他: ', '') : ''}
+                    className="w-full px-4 py-3 bg-[#F7F3E8] border border-[#E8E0D0] rounded-xl text-sm focus:outline-none focus:border-[#D4AF37] resize-none"
+                    onBlur={(e) => setExclusionReason(`其他: ${e.target.value}`)}
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="flex border-t border-[#E8E0D0]">
+              <button
+                onClick={() => {
+                  setShowExclusionModal(null);
+                  setExclusionReason('');
+                }}
+                className="flex-1 py-5 text-sm font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                返回
+              </button>
+              <button
+                onClick={confirmExclusion}
+                disabled={isExcluding}
+                className="flex-1 py-5 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors border-l border-[#E8E0D0] disabled:opacity-50"
+              >
+                {isExcluding ? '正在处理...' : '确认排除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

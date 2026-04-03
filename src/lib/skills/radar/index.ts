@@ -8,3 +8,4 @@ export { contactRoleMapSkill } from './contact-role-map';
 export { outreachPackSkill } from './outreach-pack';
 export { weeklyCadenceSkill } from './weekly-cadence';
 export { prospectDossierSkill } from './prospect-dossier';
+export { enrichAccountSkill } from './enrich-account';

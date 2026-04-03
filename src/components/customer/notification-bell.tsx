@@ -7,9 +7,18 @@ import {
   getUnreadCount,
   getNotifications,
   markNotificationRead,
-  markAllRead,
-  type NotificationItem,
+  markAllAsRead,
 } from "@/actions/notifications";
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  readAt: Date | null;
+  createdAt: Date;
+  actionUrl: string | null;
+}
 
 const TYPE_CONFIG: Record<string, { label: string; dotColor: string }> = {
   tier_a_lead: { label: "雷达", dotColor: "#D4AF37" },
@@ -79,8 +88,7 @@ export function NotificationBell({ tenantId }: { tenantId?: string }) {
   }
 
   async function handleMarkAll() {
-    if (!tenantId) return;
-    await markAllRead(tenantId);
+    await markAllAsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date() })));
     setUnread(0);
   }

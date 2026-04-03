@@ -1,7 +1,7 @@
 'use server';
 
 // ==================== Radar V2 Server Actions ====================
-// 新版获客雷达系统 - 多渠道发现 + 招标聚合
+// 閺傛壆澧楅懢宄邦吂闂嗙柉鎻化鑽ょ埠 - 婢舵碍绗柆鎾冲絺閻?+ 閹锋稒鐖ｉ懕姘値
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -39,7 +39,7 @@ import {
 } from '@/lib/radar/adapters/registry';
 import type { RadarSearchQuery } from '@/lib/radar/adapters/types';
 
-// ==================== 类型导出 ====================
+// ==================== 缁鐎风€电厧鍤?====================
 
 export type RadarSourceData = RadarSource;
 export type RadarTaskData = RadarTask;
@@ -82,18 +82,18 @@ export interface RadarStatsData {
   runningTasks: number;
 }
 
-// ==================== 去重工具函数 ====================
+// ==================== 閸樺鍣稿銉ュ徔閸戣姤鏆?====================
 
 /**
- * 规范化网站域名用于跨源去重
- * 例如: "https://www.example.com/path" -> "example.com"
+ * 鐟欏嫯瀵栭崠鏍秹缁旀瑥鐓欓崥宥囨暏娴滃氦娉曞┃鎰箵闁?
+ * 娓氬顩? "https://www.example.com/path" -> "example.com"
  */
 function normalizeDomainForDedup(website: string | null | undefined): string | null {
   if (!website) return null;
   try {
     const url = new URL(website.startsWith('http') ? website : `https://${website}`);
     let domain = url.hostname.toLowerCase();
-    // 移除 www. 前缀
+    // 缁夊娅?www. 閸撳秶绱?
     if (domain.startsWith('www.')) {
       domain = domain.slice(4);
     }
@@ -103,10 +103,10 @@ function normalizeDomainForDedup(website: string | null | undefined): string | n
   }
 }
 
-// ==================== 数据源管理 ====================
+// ==================== 閺佺増宓佸┃鎰吀閻?====================
 
 /**
- * 获取所有数据源
+ * 閼惧嘲褰囬幍鈧張澶嬫殶閹诡喗绨?
  */
 export async function getRadarSourcesV2(channelType?: ChannelType): Promise<RadarSource[]> {
   const session = await auth();
@@ -117,7 +117,7 @@ export async function getRadarSourcesV2(channelType?: ChannelType): Promise<Rada
   const where: Record<string, unknown> = {
     OR: [
       { tenantId: session.user.tenantId },
-      { tenantId: null }, // 系统级公共源
+      { tenantId: null }, // 缁崵绮虹痪褍鍙曢崗杈ㄧ爱
     ],
   };
   
@@ -136,7 +136,7 @@ export async function getRadarSourcesV2(channelType?: ChannelType): Promise<Rada
 }
 
 /**
- * 获取可用的适配器列表
+ * 閼惧嘲褰囬崣顖滄暏閻ㄥ嫰鈧倿鍘ら崳銊ュ灙鐞?
  */
 export async function getAvailableAdaptersV2(channelType?: string) {
   ensureAdaptersInitialized();
@@ -148,7 +148,7 @@ export async function getAvailableAdaptersV2(channelType?: string) {
 }
 
 /**
- * 获取适配器详情
+ * 閼惧嘲褰囬柅鍌炲帳閸ｃ劏顕涢幆?
  */
 export async function getAdapterInfoV2(code: string) {
   ensureAdaptersInitialized();
@@ -156,7 +156,7 @@ export async function getAdapterInfoV2(code: string) {
 }
 
 /**
- * 检查数据源健康状态
+ * 濡偓閺屻儲鏆熼幑顔界爱閸嬨儱鎮嶉悩鑸碘偓?
  */
 export async function checkSourceHealthV2(sourceId: string) {
   const session = await auth();
@@ -173,7 +173,7 @@ export async function checkSourceHealthV2(sourceId: string) {
   const adapter = getAdapter(source.code, source.adapterConfig as Record<string, unknown>);
   const health = await adapter.healthCheck();
   
-  // 更新数据源状态
+  // 閺囧瓨鏌婇弫鐗堝祦濠ф劗濮搁幀?
   await prisma.radarSource.update({
     where: { id: sourceId },
     data: {
@@ -191,7 +191,7 @@ export async function checkSourceHealthV2(sourceId: string) {
 }
 
 /**
- * 初始化系统数据源（首次使用时调用）
+ * 閸掓繂顫愰崠鏍兇缂佺喐鏆熼幑顔界爱閿涘牓顩诲▎鈥插▏閻劍妞傜拫鍐暏閿?
  */
 export async function initializeSystemSourcesV2() {
   const session = await auth();
@@ -203,7 +203,7 @@ export async function initializeSystemSourcesV2() {
   const created: RadarSource[] = [];
   
   for (const reg of registrations) {
-    // 检查是否已存在
+    // 濡偓閺屻儲妲搁崥锕€鍑＄€涙ê婀?
     const existing = await prisma.radarSource.findUnique({
       where: { code: reg.code },
     });
@@ -211,7 +211,7 @@ export async function initializeSystemSourcesV2() {
     if (!existing) {
       const source = await prisma.radarSource.create({
         data: {
-          tenantId: null, // 系统级
+          tenantId: null, // 缁崵绮虹痪?
           channelType: reg.channelType,
           name: reg.name,
           code: reg.code,
@@ -237,10 +237,10 @@ export async function initializeSystemSourcesV2() {
   return created;
 }
 
-// ==================== 发现任务管理 ====================
+// ==================== 閸欐垹骞囨禒璇插缁狅紕鎮?====================
 
 /**
- * 创建发现任务
+ * 閸掓稑缂撻崣鎴犲箛娴犺濮?
  */
 export async function createDiscoveryTaskV2(input: {
   sourceId: string;
@@ -252,12 +252,12 @@ export async function createDiscoveryTaskV2(input: {
     specVersionId?: string;
   };
 }): Promise<RadarTask> {
-  // 验证输入
+  // 妤犲矁鐦夋潏鎾冲弳
   if (!input.sourceId) {
     throw new ValidationError('sourceId is required');
   }
 
-  // 验证查询配置
+  // 妤犲矁鐦夐弻銉嚄闁板秶鐤?
   const validatedQuery = validateRadarQuery(input.queryConfig);
 
   const session = await auth();
@@ -274,13 +274,13 @@ export async function createDiscoveryTaskV2(input: {
 }
 
 /**
- * 运行发现任务
+ * 鏉╂劘顢戦崣鎴犲箛娴犺濮?
  */
 export async function runDiscoveryTaskV2(taskId: string): Promise<SyncResultData> {
   const session = await auth();
   if (!session?.user?.tenantId) throw new Error('Unauthorized');
   
-  // 验证任务属于当前租户
+  // 妤犲矁鐦夋禒璇插鐏炵偘绨ぐ鎾冲缁夌喐鍩?
   const task = await prisma.radarTask.findUnique({
     where: { id: taskId },
   });
@@ -293,7 +293,7 @@ export async function runDiscoveryTaskV2(taskId: string): Promise<SyncResultData
 }
 
 /**
- * 取消发现任务
+ * 閸欐牗绉烽崣鎴犲箛娴犺濮?
  */
 export async function cancelDiscoveryTaskV2(taskId: string): Promise<void> {
   const session = await auth();
@@ -311,7 +311,7 @@ export async function cancelDiscoveryTaskV2(taskId: string): Promise<void> {
 }
 
 /**
- * 获取任务列表
+ * 閼惧嘲褰囨禒璇插閸掓銆?
  */
 export async function getDiscoveryTasksV2(options?: {
   sourceId?: string;
@@ -341,7 +341,7 @@ export async function getDiscoveryTasksV2(options?: {
 }
 
 /**
- * 获取任务详情
+ * 閼惧嘲褰囨禒璇插鐠囷附鍎?
  */
 export async function getDiscoveryTaskV2(taskId: string) {
   const session = await auth();
@@ -359,10 +359,10 @@ export async function getDiscoveryTaskV2(taskId: string) {
   return task;
 }
 
-// ==================== 候选池管理 ====================
+// ==================== 閸婃瑩鈧鐫滅粻锛勬倞 ====================
 
 /**
- * 获取候选列表
+ * 閼惧嘲褰囬崐娆撯偓澶婂灙鐞?
  */
 export async function getCandidatesV2(options?: {
   candidateType?: CandidateType;
@@ -430,7 +430,7 @@ export async function getCandidatesV2(options?: {
 }
 
 /**
- * 获取候选详情
+ * 閼惧嘲褰囬崐娆撯偓澶庮嚊閹?
  */
 export async function getCandidateV2(candidateId: string) {
   const session = await auth();
@@ -449,7 +449,7 @@ export async function getCandidateV2(candidateId: string) {
 }
 
 /**
- * 合格化候选（分层）
+ * 閸氬牊鐗搁崠鏍р偓娆撯偓澶涚礄閸掑棗鐪伴敍?
  */
 export async function qualifyCandidateV2(
   candidateId: string,
@@ -478,7 +478,7 @@ export async function qualifyCandidateV2(
     },
   });
   
-  // 记录 Activity
+  // 鐠佹澘缍?Activity
   await prisma.activity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -491,7 +491,7 @@ export async function qualifyCandidateV2(
     },
   });
 
-  // 排除时异步触发：快速记录公司名 + AI 模式提炼
+  // 閹烘帡娅庨弮璺虹磽濮濄儴袝閸欐埊绱拌箛顐︹偓鐔活唶瑜版洖鍙曢崣绋挎倳 + AI 濡€崇础閹绘劗鍋?
   if (tier === 'excluded') {
     const tenantId = session.user.tenantId;
     void (async () => {
@@ -499,11 +499,11 @@ export async function qualifyCandidateV2(
         const { appendExcludedCompany, learnExclusionPattern } = await import(
           '@/lib/radar/exclusion-learner'
         );
-        // 1. 立即把公司名追加到 excludedCompanies
+        // 1. 缁斿宓嗛幎濠傚彆閸欑鎮曟潻钘夊閸?excludedCompanies
         if (candidate.profileId) {
           await appendExcludedCompany(candidate.profileId, candidate.displayName);
         }
-        // 2. 每 5 次排除触发一次 AI 模式提炼（节省 token）
+        // 2. 濮?5 濞嗏剝甯撻梽銈埿曢崣鎴滅濞?AI 濡€崇础閹绘劗鍋ч敍鍫ｅΝ閻?token閿?
         const excludedCount = await prisma.radarCandidate.count({
           where: { tenantId, status: 'EXCLUDED' },
         });
@@ -511,7 +511,7 @@ export async function qualifyCandidateV2(
           await learnExclusionPattern(tenantId, candidate.profileId);
         }
       } catch {
-        // 静默失败
+        // 闂堟瑩绮径杈Е
       }
     })();
   }
@@ -520,7 +520,7 @@ export async function qualifyCandidateV2(
 }
 
 /**
- * 批量合格化
+ * 閹靛綊鍣洪崥鍫熺壐閸?
  */
 export async function qualifyCandidatesBatchV2(
   candidateIds: string[],
@@ -544,7 +544,7 @@ export async function qualifyCandidatesBatchV2(
     },
   });
   
-  // 记录 Activity
+  // 鐠佹澘缍?Activity
   await prisma.activity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -560,10 +560,10 @@ export async function qualifyCandidatesBatchV2(
   return result.count;
 }
 
-// ==================== 导入线索库 ====================
+// ==================== 鐎电厧鍙嗙痪璺ㄥ偍鎼?====================
 
 /**
- * 导入候选到 ProspectCompany
+ * 鐎电厧鍙嗛崐娆撯偓澶婂煂 ProspectCompany
  */
 export async function importCandidateToCompanyV2(
   candidateId: string
@@ -580,7 +580,7 @@ export async function importCandidateToCompanyV2(
     throw new Error('Candidate not found');
   }
 
-  // 检查是否已导入
+  // 濡偓閺屻儲妲搁崥锕€鍑＄€电厧鍙?
   if (candidate.status === 'IMPORTED') {
     throw new Error('Candidate already imported');
   }
@@ -588,7 +588,7 @@ export async function importCandidateToCompanyV2(
   const companyName = candidate.buyerName || candidate.displayName;
   const companyCountry = candidate.buyerCountry || candidate.country;
 
-  // 去重检查：基于网站域名
+  // 閸樺鍣稿Λ鈧弻銉窗閸╄桨绨純鎴犵彲閸╃喎鎮?
   let existingCompany: { id: string } | null = null;
   if (candidate.website) {
     const domain = normalizeDomainForDedup(candidate.website);
@@ -603,7 +603,7 @@ export async function importCandidateToCompanyV2(
     }
   }
 
-  // 去重检查：基于公司名称 + 国家
+  // 閸樺鍣稿Λ鈧弻銉窗閸╄桨绨崗顒€寰冮崥宥囆?+ 閸ヨ棄顔?
   if (!existingCompany && companyName) {
     existingCompany = await prisma.prospectCompany.findFirst({
       where: {
@@ -615,7 +615,7 @@ export async function importCandidateToCompanyV2(
     });
   }
 
-  // 如果已存在，返回已有记录并标记候选已导入
+  // 婵″倹鐏夊鎻掔摠閸︻煉绱濇潻鏂挎礀瀹稿弶婀佺拋鏉跨秿楠炶埖鐖ｇ拋鏉库偓娆撯偓澶婂嚒鐎电厧鍙?
   if (existingCompany) {
     await prisma.radarCandidate.update({
       where: { id: candidateId },
@@ -630,7 +630,7 @@ export async function importCandidateToCompanyV2(
     return prisma.prospectCompany.findUnique({ where: { id: existingCompany.id } }) as Promise<ProspectCompany>;
   }
 
-  // 创建 ProspectCompany
+  // 閸掓稑缂?ProspectCompany
   const company = await prisma.prospectCompany.create({
     data: {
       tenantId: session.user.tenantId,
@@ -645,6 +645,8 @@ export async function importCandidateToCompanyV2(
       companySize: candidate.companySize,
       description: candidate.description,
       tier: candidate.qualifyTier,
+      matchReasons: (candidate.aiRelevance as any)?.reasons || (candidate.matchExplain as any)?.reasons || null,
+      approachAngle: candidate.aiSummary || null,
       sourceType: candidate.source.channelType.toLowerCase(),
       sourceCandidateId: candidateId,
       sourceUrl: candidate.sourceUrl,
@@ -652,14 +654,14 @@ export async function importCandidateToCompanyV2(
     },
   });
   
-  // 自动提取决策者联系人（失败不阻塞导入）
+  // 閼奉亜濮╅幓鎰絿閸愬磭鐡ラ懓鍛颁粓缁姹夐敍鍫濄亼鐠愩儰绗夐梼璇差敚鐎电厧鍙嗛敍?
   try {
     await extractContactsFromCandidate(candidate, company.id, session.user.tenantId, candidateId);
   } catch (err) {
     console.error('[importCandidateToCompanyV2] Contact extraction failed (non-blocking):', err);
   }
   
-  // 更新候选状态
+  // 閺囧瓨鏌婇崐娆撯偓澶屽Ц閹?
   await prisma.radarCandidate.update({
     where: { id: candidateId },
     data: {
@@ -671,7 +673,7 @@ export async function importCandidateToCompanyV2(
     },
   });
   
-  // 记录 Activity
+  // 鐠佹澘缍?Activity
   await prisma.activity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -688,7 +690,7 @@ export async function importCandidateToCompanyV2(
 }
 
 /**
- * 导入候选到 Opportunity
+ * 鐎电厧鍙嗛崐娆撯偓澶婂煂 Opportunity
  */
 export async function importCandidateToOpportunityV2(
   candidateId: string,
@@ -710,7 +712,7 @@ export async function importCandidateToOpportunityV2(
     throw new Error('Candidate is not an opportunity');
   }
   
-  // 创建 Opportunity
+  // 閸掓稑缂?Opportunity
   const opportunity = await prisma.opportunity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -729,7 +731,7 @@ export async function importCandidateToOpportunityV2(
     },
   });
   
-  // 更新候选状态
+  // 閺囧瓨鏌婇崐娆撯偓澶屽Ц閹?
   await prisma.radarCandidate.update({
     where: { id: candidateId },
     data: {
@@ -741,7 +743,7 @@ export async function importCandidateToOpportunityV2(
     },
   });
   
-  // 记录 Activity
+  // 鐠佹澘缍?Activity
   await prisma.activity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -758,13 +760,13 @@ export async function importCandidateToOpportunityV2(
 }
 
 /**
- * 批量导入
+ * 閹靛綊鍣虹€电厧鍙?
  */
 export async function importCandidatesBatchV2(
   candidateIds: string[],
   targetType: 'company' | 'opportunity'
 ): Promise<{ imported: number; failed: number }> {
-  // 验证输入
+  // 妤犲矁鐦夋潏鎾冲弳
   if (!candidateIds || candidateIds.length === 0) {
     throw new ValidationError('candidateIds is required');
   }
@@ -798,10 +800,10 @@ export async function importCandidatesBatchV2(
   return { imported, failed };
 }
 
-// ==================== ProspectCompany 管理 ====================
+// ==================== ProspectCompany 缁狅紕鎮?====================
 
 /**
- * 获取线索公司列表
+ * 閼惧嘲褰囩痪璺ㄥ偍閸忣剙寰冮崚妤勩€?
  */
 export async function getProspectCompaniesV2(options?: {
   status?: string;
@@ -849,10 +851,10 @@ export async function getProspectCompaniesV2(options?: {
   return { companies: companies as ProspectCompanyData[], total };
 }
 
-// ==================== Opportunity 管理 ====================
+// ==================== Opportunity 缁狅紕鎮?====================
 
 /**
- * 获取机会列表
+ * 閼惧嘲褰囬張杞扮窗閸掓銆?
  */
 export async function getOpportunitiesV2(options?: {
   stage?: string;
@@ -904,7 +906,7 @@ export async function getOpportunitiesV2(options?: {
 }
 
 /**
- * 更新机会阶段
+ * 閺囧瓨鏌婇張杞扮窗闂冭埖顔?
  */
 export async function updateOpportunityStageV2(
   opportunityId: string,
@@ -932,7 +934,7 @@ export async function updateOpportunityStageV2(
     },
   });
   
-  // 记录 Activity
+  // 鐠佹澘缍?Activity
   await prisma.activity.create({
     data: {
       tenantId: session.user.tenantId,
@@ -948,10 +950,10 @@ export async function updateOpportunityStageV2(
   return updated;
 }
 
-// ==================== ProspectContact 管理 ====================
+// ==================== ProspectContact 缁狅紕鎮?====================
 
 /**
- * 从候选原始数据中推断联系人职级
+ * 娴犲骸鈧瑩鈧甯慨瀣殶閹诡喕鑵戦幒銊︽焽閼辨梻閮存禍楦夸捍缁?
  */
 function inferSeniority(title: string | undefined): string | null {
   if (!title) return null;
@@ -964,7 +966,7 @@ function inferSeniority(title: string | undefined): string | null {
 }
 
 /**
- * 从候选数据的 intelligence 中提取联系人并创建 ProspectContact
+ * 娴犲骸鈧瑩鈧鏆熼幑顔炬畱 intelligence 娑擃厽褰侀崣鏍粓缁姹夐獮璺哄灡瀵?ProspectContact
  */
 async function extractContactsFromCandidate(
   candidate: RadarCandidate,
@@ -991,7 +993,7 @@ async function extractContactsFromCandidate(
   let created = 0;
   for (const dm of decisionMakers) {
     if (!dm.name) continue;
-    // 去重：同公司同名跳过
+    // 閸樺鍣搁敍姘倱閸忣剙寰冮崥灞芥倳鐠哄疇绻?
     const exists = await prisma.prospectContact.findFirst({
       where: { tenantId, companyId, name: dm.name, deletedAt: null },
     });
@@ -1016,7 +1018,7 @@ async function extractContactsFromCandidate(
 }
 
 /**
- * 获取公司联系人列表
+ * 閼惧嘲褰囬崗顒€寰冮懕鏃傞兇娴滃搫鍨悰?
  */
 export async function getProspectContacts(companyId: string): Promise<ProspectContactData[]> {
   const session = await auth();
@@ -1036,7 +1038,7 @@ export async function getProspectContacts(companyId: string): Promise<ProspectCo
 }
 
 /**
- * 创建联系人
+ * 閸掓稑缂撻懕鏃傞兇娴?
  */
 export async function createProspectContact(input: CreateProspectContactInput): Promise<ProspectContactData> {
   const session = await auth();
@@ -1079,7 +1081,7 @@ export async function createProspectContact(input: CreateProspectContactInput): 
 }
 
 /**
- * 更新联系人
+ * 閺囧瓨鏌婇懕鏃傞兇娴?
  */
 export async function updateProspectContact(
   contactId: string,
@@ -1111,7 +1113,7 @@ export async function updateProspectContact(
 }
 
 /**
- * 删除联系人（软删除）
+ * 閸掔娀娅庨懕鏃傞兇娴滅尨绱欐潪顖氬灩闂勩倧绱?
  */
 export async function deleteProspectContact(contactId: string): Promise<void> {
   const session = await auth();
@@ -1140,10 +1142,10 @@ export async function deleteProspectContact(contactId: string): Promise<void> {
   });
 }
 
-// ==================== 背调简报 ====================
+// ==================== 閼冲矁鐨熺粻鈧幎?====================
 
 /**
- * 生成客户背调简报
+ * 閻㈢喐鍨氱€广垺鍩涢懗宀冪殶缁犫偓閹?
  */
 export async function generateProspectDossier(companyId: string): Promise<{
   ok: boolean;
@@ -1159,7 +1161,7 @@ export async function generateProspectDossier(companyId: string): Promise<{
     throw new Error('Company not found');
   }
 
-  // 收集所有相关数据
+  // 閺€鍫曟肠閹碘偓閺堝娴夐崗铏殶閹?
   const [contacts, opportunities, sourceCandidate] = await Promise.all([
     prisma.prospectContact.findMany({
       where: { tenantId: session.user.tenantId, companyId, deletedAt: null },
@@ -1172,11 +1174,11 @@ export async function generateProspectDossier(companyId: string): Promise<{
       : null,
   ]);
 
-  // 提取 intelligence 数据
+  // 閹绘劕褰?intelligence 閺佺増宓?
   const rawData = sourceCandidate?.rawData as Record<string, unknown> | null;
   const intelligence = rawData?.intelligence as Record<string, unknown> | undefined;
 
-  // 调用 AI 技能
+  // 鐠嬪啰鏁?AI 閹垛偓閼?
   const { executeSkill } = await import('@/actions/skills');
   const result = await executeSkill(
     'radar.generateProspectDossier',
@@ -1241,7 +1243,7 @@ export async function generateProspectDossier(companyId: string): Promise<{
 }
 
 /**
- * 获取最新背调简报
+ * 閼惧嘲褰囬張鈧弬鎷屽剹鐠嬪啰鐣濋幎?
  */
 export async function getLatestProspectDossier(companyId: string): Promise<{
   id: string;
@@ -1271,10 +1273,10 @@ export async function getLatestProspectDossier(companyId: string): Promise<{
   };
 }
 
-// ==================== 统计 ====================
+// ==================== 缂佺喕顓?====================
 
 /**
- * 获取雷达统计
+ * 閼惧嘲褰囬梿鐤彧缂佺喕顓?
  */
 export async function getRadarStatsV2(): Promise<RadarStatsData> {
   const session = await auth();
@@ -1311,7 +1313,7 @@ export async function getRadarStatsV2(): Promise<RadarStatsData> {
   };
 }
 
-// ==================== RadarSearchProfile 管理 ====================
+// ==================== RadarSearchProfile 缁狅紕鎮?====================
 
 export interface RadarSearchProfileData {
   id: string;
@@ -1346,7 +1348,7 @@ export interface RadarSearchProfileData {
   exclusionRules: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
-  // 关联
+  // 閸忓疇浠?
   segment?: { id: string; name: string } | null;
   persona?: { id: string; name: string } | null;
   _count?: { cursors: number };
@@ -1369,15 +1371,15 @@ export interface CreateRadarSearchProfileInput {
   maxRunSeconds?: number;
   autoQualify?: boolean;
   autoEnrich?: boolean;
-  // 新增：精准定位字段
-  targetCustomerType?: string[];      // 目标客户类型：manufacturer, distributor, service_provider, retailer
-  businessScenario?: string;          // 业务场景描述：我卖什么，客户需要什么
-  exampleCustomers?: string[];        // 示例目标客户
-  myProduct?: string;                 // 我的产品/服务
+  // 閺傛澘顤冮敍姘辩翱閸戝棗鐣炬担宥呯摟濞?
+  targetCustomerType?: string[];      // 閻╊喗鐖ｇ€广垺鍩涚猾璇茬€烽敍姝產nufacturer, distributor, service_provider, retailer
+  businessScenario?: string;          // 娑撴艾濮熼崷鐑樻珯閹诲繗鍫敍姘灉閸楁牔绮堟稊鍫礉鐎广垺鍩涢棁鈧憰浣风矆娑?
+  exampleCustomers?: string[];        // 缁€杞扮伐閻╊喗鐖ｇ€广垺鍩?
+  myProduct?: string;                 // 閹存垹娈戞禍褍鎼?閺堝秴濮?
 }
 
 /**
- * 获取扫描计划列表
+ * 閼惧嘲褰囬幍顐ｅ伎鐠佲€冲灊閸掓銆?
  */
 export async function getRadarSearchProfiles(options?: {
   isActive?: boolean;
@@ -1404,7 +1406,7 @@ export async function getRadarSearchProfiles(options?: {
     take: options?.limit || 100,
   });
   
-  // 获取关联的 segment 和 persona
+  // 閼惧嘲褰囬崗瀹犱粓閻?segment 閸?persona
   const segmentIds = profiles.map(p => p.segmentId).filter(Boolean) as string[];
   const personaIds = profiles.map(p => p.personaId).filter(Boolean) as string[];
   
@@ -1440,7 +1442,7 @@ export async function getRadarSearchProfiles(options?: {
 }
 
 /**
- * 获取单个扫描计划
+ * 閼惧嘲褰囬崡鏇氶嚋閹殿偅寮跨拋鈥冲灊
  */
 export async function getRadarSearchProfile(profileId: string): Promise<RadarSearchProfileData | null> {
   const session = await auth();
@@ -1454,7 +1456,7 @@ export async function getRadarSearchProfile(profileId: string): Promise<RadarSea
     return null;
   }
   
-  // 获取关联数据
+  // 閼惧嘲褰囬崗瀹犱粓閺佺増宓?
   const [segment, persona, cursorCount] = await Promise.all([
     profile.segmentId ? prisma.iCPSegment.findUnique({ where: { id: profile.segmentId }, select: { id: true, name: true } }) : null,
     profile.personaId ? prisma.persona.findUnique({ where: { id: profile.personaId }, select: { id: true, name: true } }) : null,
@@ -1475,13 +1477,13 @@ export async function getRadarSearchProfile(profileId: string): Promise<RadarSea
 }
 
 /**
- * 创建扫描计划
+ * 閸掓稑缂撻幍顐ｅ伎鐠佲€冲灊
  */
 export async function createRadarSearchProfile(input: CreateRadarSearchProfileInput): Promise<RadarSearchProfileData> {
   const session = await auth();
   if (!session?.user?.tenantId) throw new Error('Unauthorized');
   
-  // 计算初始 nextRunAt
+  // 鐠侊紕鐣婚崚婵嗩潗 nextRunAt
   let nextRunAt: Date | null = null;
   if (input.scheduleRule) {
     try {
@@ -1532,7 +1534,7 @@ export async function createRadarSearchProfile(input: CreateRadarSearchProfileIn
 }
 
 /**
- * 更新扫描计划
+ * 閺囧瓨鏌婇幍顐ｅ伎鐠佲€冲灊
  */
 export async function updateRadarSearchProfile(
   profileId: string,
@@ -1541,7 +1543,7 @@ export async function updateRadarSearchProfile(
   const session = await auth();
   if (!session?.user?.tenantId) throw new Error('Unauthorized');
   
-  // 修改 scheduleRule 需要决策者权限
+  // 娣囶喗鏁?scheduleRule 闂団偓鐟曚礁鍠呯粵鏍偓鍛綀闂?
   if (input.scheduleRule !== undefined) {
     const roleCheck = requireDecider(session);
     if (!roleCheck.authorized) {
@@ -1576,7 +1578,7 @@ export async function updateRadarSearchProfile(
   if (input.autoEnrich !== undefined) data.autoEnrich = input.autoEnrich;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   
-  // 如果修改了 scheduleRule，重新计算 nextRunAt
+  // 婵″倹鐏夋穱顔芥暭娴?scheduleRule閿涘矂鍣搁弬鎷岊吀缁?nextRunAt
   if (input.scheduleRule !== undefined) {
     data.scheduleRule = input.scheduleRule;
     try {
@@ -1596,7 +1598,7 @@ export async function updateRadarSearchProfile(
 }
 
 /**
- * 切换扫描计划启用状态
+ * 閸掑洦宕查幍顐ｅ伎鐠佲€冲灊閸氼垳鏁ら悩鑸碘偓?
  */
 export async function toggleRadarSearchProfileActive(profileId: string): Promise<boolean> {
   const session = await auth();
@@ -1612,7 +1614,7 @@ export async function toggleRadarSearchProfileActive(profileId: string): Promise
   
   const newActive = !existing.isActive;
   
-  // 如果重新启用，计算新的 nextRunAt
+  // 婵″倹鐏夐柌宥嗘煀閸氼垳鏁ら敍宀冾吀缁犳鏌婇惃?nextRunAt
   let nextRunAt = existing.nextRunAt;
   if (newActive && !existing.nextRunAt) {
     try {
@@ -1630,7 +1632,7 @@ export async function toggleRadarSearchProfileActive(profileId: string): Promise
     data: { 
       isActive: newActive,
       nextRunAt: newActive ? nextRunAt : null,
-      // 清除锁状态
+      // 濞撳懘娅庨柨浣哄Ц閹?
       lockToken: null,
       lockedAt: null,
       lockedBy: null,
@@ -1641,7 +1643,7 @@ export async function toggleRadarSearchProfileActive(profileId: string): Promise
 }
 
 /**
- * 删除扫描计划
+ * 閸掔娀娅庨幍顐ｅ伎鐠佲€冲灊
  */
 export async function deleteRadarSearchProfile(profileId: string): Promise<void> {
   const session = await auth();
@@ -1659,7 +1661,7 @@ export async function deleteRadarSearchProfile(profileId: string): Promise<void>
     throw new Error('Profile not found');
   }
   
-  // 先删除关联的游标
+  // 閸忓牆鍨归梽銈呭彠閼辨梻娈戝〒鍛婄垼
   await prisma.radarScanCursor.deleteMany({
     where: { profileId },
   });
@@ -1670,7 +1672,7 @@ export async function deleteRadarSearchProfile(profileId: string): Promise<void>
 }
 
 /**
- * 获取扫描计划的游标状态
+ * 閼惧嘲褰囬幍顐ｅ伎鐠佲€冲灊閻ㄥ嫭鐖堕弽鍥╁Ц閹?
  */
 export async function getRadarSearchProfileCursors(profileId: string) {
   const session = await auth();
@@ -1689,7 +1691,7 @@ export async function getRadarSearchProfileCursors(profileId: string) {
     orderBy: { lastScanAt: 'desc' },
   });
   
-  // 获取 source 名称
+  // 閼惧嘲褰?source 閸氬秶袨
   const sourceIds = cursors.map(c => c.sourceId);
   const sources = await prisma.radarSource.findMany({
     where: { id: { in: sourceIds } },
@@ -1705,7 +1707,7 @@ export async function getRadarSearchProfileCursors(profileId: string) {
 }
 
 /**
- * 手动触发扫描
+ * 閹靛濮╃憴锕€褰傞幍顐ｅ伎
  */
 export async function triggerRadarSearchProfileScan(profileId: string): Promise<{ success: boolean; message: string }> {
   const session = await auth();
@@ -1719,15 +1721,15 @@ export async function triggerRadarSearchProfileScan(profileId: string): Promise<
     throw new Error('Profile not found');
   }
   
-  // 检查是否已被锁定
+  // 濡偓閺屻儲妲搁崥锕€鍑＄悮顐︽敚鐎?
   if (profile.lockToken && profile.lockedAt) {
     const lockAge = Date.now() - profile.lockedAt.getTime();
     if (lockAge < 5 * 60 * 1000) {
-      return { success: false, message: '扫描正在进行中，请稍后再试' };
+      return { success: false, message: '任务已在运行中，请稍后再试' };
     }
   }
   
-  // 设置 nextRunAt 为现在，让调度器立即拾取
+  // 鐠佸墽鐤?nextRunAt 娑撹櫣骞囬崷顭掔礉鐠佲晞鐨熸惔锕€娅掔粩瀣祮閹锋儳褰?
   await prisma.radarSearchProfile.update({
     where: { id: profileId },
     data: { 
@@ -1736,17 +1738,33 @@ export async function triggerRadarSearchProfileScan(profileId: string): Promise<
     },
   });
   
-  return { success: true, message: '已触发扫描，调度器将在下一个周期执行' };
+  return { success: true, message: '扫描任务已加入队列' };
 }
 
-// ==================== 清理 ====================
+// ==================== 濞撳懐鎮?====================
+
+// ==================== 辅助任务 ====================
 
 /**
- * 清理过期候选
+ * 清理过期的候选人数据
  */
 export async function cleanupExpiredV2(): Promise<number> {
   const session = await auth();
   if (!session?.user?.tenantId) throw new Error('Unauthorized');
-  
   return cleanupExpiredCandidates();
+}
+
+import { enrichProspectCompany } from '@/lib/radar/enrich-pipeline';
+
+/**
+ * 手动触发线索丰富化
+ */
+export async function enrichProspectCompanyAction(companyId: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) throw new Error('Unauthorized');
+  const company = await prisma.prospectCompany.findUnique({
+    where: { id: companyId, tenantId: session.user.tenantId }
+  });
+  if (!company) throw new Error('Company not found');
+  return await enrichProspectCompany(company as any);
 }

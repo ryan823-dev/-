@@ -643,3 +643,88 @@ export async function getCompanyOutreachHistory(
 
   return { records };
 }
+
+/**
+ * 保存外联工具包到公司档案（支持版本管理）
+ */
+export async function saveOutreachArtifacts(
+  companyId: string,
+  artifacts: any
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.tenantId) return { success: false, error: 'Unauthorized' };
+
+  try {
+    const company = await prisma.prospectCompany.findUnique({
+      where: { id: companyId, tenantId: session.user.tenantId },
+      select: { outreachArtifacts: true }
+    });
+
+    let currentArtifacts = company?.outreachArtifacts as any;
+    const newEntry = {
+      ...artifacts,
+      timestamp: new Date().toISOString(),
+      version: 1
+    };
+
+    if (!currentArtifacts) {
+      currentArtifacts = [newEntry];
+    } else if (Array.isArray(currentArtifacts)) {
+      newEntry.version = currentArtifacts.length + 1;
+      currentArtifacts = [newEntry, ...currentArtifacts].slice(0, 10); // Keep last 10
+    } else {
+      // Legacy single object format
+      currentArtifacts = [newEntry, { ...currentArtifacts, version: 0, timestamp: new Date(0).toISOString() }];
+    }
+
+    await prisma.prospectCompany.update({
+      where: { 
+        id: companyId,
+        tenantId: session.user.tenantId
+      },
+      data: {
+        outreachArtifacts: currentArtifacts
+      }
+    });
+    return { success: true };
+  } catch (err) {
+    return { 
+      success: false, 
+      error: err instanceof Error ? err.message : '保存失败' 
+    };
+  }
+}
+
+/**
+ * 获取公司已保存的外联工具包（返回列表和最新版）
+ */
+export async function getSavedOutreachArtifacts(
+  companyId: string
+): Promise<{ success: boolean; artifacts?: any; latest?: any; all?: any[]; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.tenantId) return { success: false, error: 'Unauthorized' };
+
+  try {
+    const company = await prisma.prospectCompany.findUnique({
+      where: { 
+        id: companyId,
+        tenantId: session.user.tenantId
+      },
+      select: {
+        outreachArtifacts: true
+      }
+    });
+
+    const artifacts = company?.outreachArtifacts;
+    if (Array.isArray(artifacts)) {
+      return { success: true, artifacts: artifacts[0], latest: artifacts[0], all: artifacts };
+    }
+    
+    return { success: true, artifacts: artifacts || null, latest: artifacts || null, all: artifacts ? [artifacts] : [] };
+  } catch (err) {
+    return { 
+      success: false, 
+      error: err instanceof Error ? err.message : '加载失败' 
+    };
+  }
+}

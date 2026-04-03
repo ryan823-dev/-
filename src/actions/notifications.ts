@@ -1,114 +1,87 @@
-"use server";
+'use server';
 
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
 
-export type NotificationItem = {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  actionUrl: string | null;
-  readAt: Date | null;
-  createdAt: Date;
-};
-
-// ===================== Fetch unread count =====================
-
-export async function getUnreadCount(): Promise<number> {
+export async function getNotifications(limit = 20) {
   const session = await auth();
-  if (!session?.user?.id) return 0;
+  if (!session?.user?.tenantId) return [];
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { tenantId: true },
+  return await db.notification.findMany({
+    where: {
+      tenantId: session.user.tenantId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: limit,
   });
-  if (!user?.tenantId) return 0;
-
-  try {
-    const count = await (prisma as unknown as Record<string, { count: (args: unknown) => Promise<number> }>).notification.count({
-      where: { tenantId: user.tenantId, readAt: null },
-    });
-    return count;
-  } catch {
-    return 0;
-  }
 }
 
-// ===================== Fetch notifications =====================
-
-export async function getNotifications(limit = 20): Promise<NotificationItem[]> {
+export async function getUnreadCount() {
   const session = await auth();
-  if (!session?.user?.id) return [];
+  if (!session?.user?.tenantId) return 0;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { tenantId: true },
+  return await db.notification.count({
+    where: {
+      tenantId: session.user.tenantId,
+      readAt: null,
+    },
   });
-  if (!user?.tenantId) return [];
-
-  try {
-    const rows = await (prisma as unknown as Record<string, { findMany: (args: unknown) => Promise<NotificationItem[]> }>).notification.findMany({
-      where: { tenantId: user.tenantId },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-    return rows;
-  } catch {
-    return [];
-  }
 }
 
-// ===================== Mark as read =====================
+export async function markNotificationRead(id: string) {
+  return markAsRead(id);
+}
 
-export async function markNotificationRead(id: string): Promise<void> {
+export async function markAsRead(id: string) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user?.tenantId) return { success: false };
 
-  try {
-    await (prisma as unknown as Record<string, { update: (args: unknown) => Promise<unknown> }>).notification.update({
-      where: { id },
-      data: { readAt: new Date() },
-    });
-    revalidatePath("/customer", "layout");
-  } catch {
-    // no-op if model not yet migrated
-  }
+  await db.notification.update({
+    where: {
+      id,
+      tenantId: session.user.tenantId,
+    },
+    data: {
+      readAt: new Date(),
+    },
+  });
+
+  revalidatePath('/');
+  return { success: true };
 }
 
-export async function markAllRead(tenantId: string): Promise<void> {
-  try {
-    await (prisma as unknown as Record<string, { updateMany: (args: unknown) => Promise<unknown> }>).notification.updateMany({
-      where: { tenantId, readAt: null },
-      data: { readAt: new Date() },
-    });
-    revalidatePath("/customer", "layout");
-  } catch {
-    // no-op
-  }
+export async function markAllAsRead() {
+  const session = await auth();
+  if (!session?.user?.tenantId) return { success: false };
+
+  await db.notification.updateMany({
+    where: {
+      tenantId: session.user.tenantId,
+      readAt: null,
+    },
+    data: {
+      readAt: new Date(),
+    },
+  });
+
+  revalidatePath('/');
+  return { success: true };
 }
 
-// ===================== Create notification (server-side helper) =====================
-
-export async function createNotification(params: {
+/**
+ * 内部辅助函数：创建通知
+ */
+export async function createNotification(data: {
   tenantId: string;
-  type: string;
+  type: 'tier_a_lead' | 'geo_citation' | 'publish_failed' | 'system';
   title: string;
   body: string;
   actionUrl?: string;
-}): Promise<void> {
-  try {
-    await (prisma as unknown as Record<string, { create: (args: unknown) => Promise<unknown> }>).notification.create({
-      data: {
-        tenantId: params.tenantId,
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        actionUrl: params.actionUrl ?? null,
-      },
-    });
-  } catch {
-    // no-op if model not yet migrated
-  }
+}) {
+  return await db.notification.create({
+    data,
+  });
 }

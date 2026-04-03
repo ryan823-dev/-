@@ -318,6 +318,19 @@ export async function updateCompanyProfile(
     }
   }
 
+  // Sync targetRegions -> RadarSearchProfile.targetRegions (Task #132)
+  if (data.targetRegions !== undefined) {
+    const regions = (data.targetRegions as Array<{ name?: string } | string>)
+      .map((i) => (typeof i === 'string' ? i : i.name ?? ''))
+      .filter(Boolean);
+    if (regions.length) {
+      (db as any).radarSearchProfile.updateMany({
+        where: { tenantId: session.user.tenantId, targetRegions: { isEmpty: true } },
+        data: { targetRegions: regions },
+      }).catch(() => { /* non-critical */ });
+    }
+  }
+
   return {
     id: profile.id,
     companyName: profile.companyName,
