@@ -59,7 +59,7 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect");
     if (redirect) {
-      setRedirectUrl(redirect);
+      setRedirectUrl(redirect); // eslint-disable-line react-hooks/set-state-in-effect -- one-time URL param hydration
     }
   }, []);
 
