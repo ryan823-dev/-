@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "出海管理平台",
-  description: "工业产业出海一站式管理平台",
+  title: "VertaX · 出海增长引擎",
+  description: "AI驱动的工业出海获客与增长引擎",
 };
 
 export default function RootLayout({

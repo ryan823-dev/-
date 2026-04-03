@@ -145,10 +145,10 @@ export default function LoginPage() {
             <h2 className="text-4xl font-bold leading-tight" style={{ color: '#ffffff' }}>
               工业出海
               <br />
-              <span style={{ color: '#D4AF37' }}>增长智能系统</span>
+              <span style={{ color: '#D4AF37' }}>增长引擎</span>
             </h2>
             <p className="text-lg" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              把海外获客做成「可计算、可复制、可审计」的增长系统
+              把海外获客做成可计算、可复制、可审计的增长引擎
             </p>
           </div>
 
