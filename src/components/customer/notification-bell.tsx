@@ -49,14 +49,14 @@ export function NotificationBell({ tenantId }: { tenantId?: string }) {
 
   // Poll unread count every 60s
   useEffect(() => {
-    loadCount();
-    const interval = setInterval(loadCount, 60000);
+    void loadCount(); // eslint-disable-line react-hooks/set-state-in-effect -- async fetch
+    const interval = setInterval(() => void loadCount(), 60000);
     return () => clearInterval(interval);
   }, [loadCount]);
 
   // Open/close drawer
   useEffect(() => {
-    if (open) loadNotifications();
+    if (open) void loadNotifications(); // eslint-disable-line react-hooks/set-state-in-effect -- async fetch
   }, [open, loadNotifications]);
 
   // Click outside to close

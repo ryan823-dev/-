@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, Menu, X } from 'lucide-react';
@@ -53,12 +53,12 @@ export function CustomerSidebar({
 
   // Close mobile sidebar on route change
   useEffect(() => {
-    setMobileOpen(false);
+    setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- sync with route
   }, [pathname]);
 
-  // 获取配置数据
-  const groups = getSortedGroups();
-  const itemsByGroup = getNavItemsByGroup();
+  // 获取配置数据（纯函数，结果稳定）
+  const groups = useMemo(() => getSortedGroups(), []);
+  const itemsByGroup = useMemo(() => getNavItemsByGroup(), []);
 
   // SSR-safe: always start as null, then hydrate from localStorage
   const [expandedNav, setExpandedNav] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function CustomerSidebar({
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      setExpandedNav(stored);
+      setExpandedNav(stored); // eslint-disable-line react-hooks/set-state-in-effect -- hydrate from localStorage
       return;
     }
     // Auto-expand group matching current route

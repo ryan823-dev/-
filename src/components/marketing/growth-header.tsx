@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import type {
   StepState,
-  StepStatus,
   GrowthPipelineCounts,
   PrimaryCTA,
 } from "@/lib/marketing/growth-pipeline";
@@ -231,6 +230,19 @@ function KnowledgeIndicator({ counts }: { counts: GrowthPipelineCounts }) {
 // 主组件
 // ============================================
 
+function formatDate(date: Date | null) {
+  if (!date) return "暂无记录";
+  const diff = Date.now() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes}m 前`;
+  if (hours < 24) return `${hours}h 前`;
+  if (days < 7) return `${days}d 前`;
+  return new Date(date).toLocaleDateString("zh-CN");
+}
+
 export function GrowthHeader({
   title,
   description,
@@ -241,18 +253,6 @@ export function GrowthHeader({
   isRefreshing = false,
   onRefresh,
 }: GrowthHeaderProps) {
-  const formatDate = (date: Date | null) => {
-    if (!date) return "暂无记录";
-    const diff = Date.now() - new Date(date).getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    if (minutes < 1) return "刚刚";
-    if (minutes < 60) return `${minutes}m 前`;
-    if (hours < 24) return `${hours}h 前`;
-    if (days < 7) return `${days}d 前`;
-    return new Date(date).toLocaleDateString("zh-CN");
-  };
 
   return (
     <div

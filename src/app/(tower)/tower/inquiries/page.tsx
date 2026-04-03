@@ -102,7 +102,7 @@ export default function TowerInquiriesPage() {
             )}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            来自"获取使用资格"页面的商务咨询 · 共 {inquiries.length} 条
+            来自&quot;获取使用资格&quot;页面的商务咨询 · 共 {inquiries.length} 条
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadInquiries}>

@@ -9,7 +9,6 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  X,
   Eye,
   EyeOff,
   Trash2,
@@ -204,7 +203,7 @@ export default function SocialAccountsPage() {
     }
   };
 
-  const maskValue = (val: string) => {
+  const _maskValue = (val: string) => {
     if (val.length <= 8) return '********';
     return val.slice(0, 4) + '****' + val.slice(-4);
   };
@@ -536,8 +535,8 @@ export default function SocialAccountsPage() {
           <div className="space-y-2 text-xs text-slate-400">
             <p>1. Create a developer account on the respective social media platform</p>
             <p>2. Create an application and obtain API credentials</p>
-            <p>3. Enter the credentials above and click "Test Connection" to verify</p>
-            <p>4. After successful verification, click "Save Credentials" to complete the setup</p>
+            <p>3. Enter the credentials above and click &quot;Test Connection&quot; to verify</p>
+            <p>4. After successful verification, click &quot;Save Credentials&quot; to complete the setup</p>
           </div>
           <p className="text-[10px] text-slate-500 mt-4">
             Note: Credentials are securely stored and only used for authorized content publishing.

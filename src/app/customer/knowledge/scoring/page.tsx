@@ -30,7 +30,8 @@ export default function ScoringProfilePage() {
     }
   }, []);
 
-  useEffect(() => { loadPipelineStatus(); }, [loadPipelineStatus]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch, setState is called after await
+  useEffect(() => { void loadPipelineStatus(); }, [loadPipelineStatus]);
 
   if (!mounted) return null;
 

@@ -12,7 +12,7 @@ import { chatCompletion } from '@/lib/ai-client';
 
 export class CompetitiveDiscoveryAdapter implements RadarAdapter {
   readonly sourceCode = 'competitive_discovery';
-  readonly channelType: 'ECOSYSTEM' = 'ECOSYSTEM';
+  readonly channelType = 'ECOSYSTEM' as const;
   readonly supportedFeatures = {
     supportsKeywordSearch: true,
     supportsCategoryFilter: false,
@@ -164,7 +164,8 @@ export class CompetitiveDiscoveryAdapter implements RadarAdapter {
     }
 
     // 构建搜索查询
-    const countryFilter = countries && countries.length > 0
+    // TODO: use countryFilter for geo-targeted discovery
+    const _countryFilter = countries && countries.length > 0
       ? `from ${countries.join(' OR ')}`
       : '';
 
