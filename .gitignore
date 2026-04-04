@@ -16,6 +16,10 @@
 /coverage
 /playwright-report
 /test-results
+tests/screenshots
+tests/test-results
+tests/test-results.json
+tests/playwright-report
 
 # ----- Next.js -----
 /.next/
