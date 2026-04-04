@@ -48,7 +48,7 @@ import {
   getWebsiteConfig,
 } from '@/actions/publishing';
 import type { PushRecordData, WebsiteConfigData } from '@/actions/publishing.types';
-import { SkillPanel, SkillTrigger } from '@/components/skills';
+import { SkillStreamPanel, SkillStreamTrigger } from '@/components/skills';
 import { SKILL_NAMES } from '@/lib/skills/registry';
 
 type ViewMode = 'list' | 'create' | 'detail';
@@ -828,9 +828,9 @@ export default function MarketingPage() {
                   </div>
                 )}
 
-                {/* AI Skills Panel */}
+                {/* AI Skills Panel (流式) */}
                 <div className="bg-[#F7F3E8] rounded-2xl border border-[#E8E0D0] p-6">
-                  <SkillPanel
+                  <SkillStreamPanel
                     engine="marketing"
                     entityType="Content"
                     entityId={selectedContent.id}
@@ -860,7 +860,7 @@ export default function MarketingPage() {
                     <p className="text-xs text-slate-500 mb-3 line-clamp-2">
                       针对「{c.title}」检查主张是否有证据支撑
                     </p>
-                    <SkillTrigger
+                    <SkillStreamTrigger
                       skillName={SKILL_NAMES.MARKETING_VERIFY_CLAIMS}
                       displayName="AI 证据校验"
                       description="检查内容中的主张是否有证据支撑，列出缺失项"
@@ -868,7 +868,7 @@ export default function MarketingPage() {
                       entityId={c.id}
                       input={{ contentPiece: { id: c.id, title: c.title, content: c.content.slice(0, 4000) } }}
                       useCompanyProfile={true}
-                      onSuccess={() => loadData()}
+                      onComplete={() => loadData()}
                       variant="outline"
                       size="sm"
                       className="w-full border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10"

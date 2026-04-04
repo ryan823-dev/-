@@ -19,7 +19,7 @@ import { getDistributionStats, type GeoDistributionStats } from "@/actions/geo-d
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { SkillTrigger } from "@/components/skills";
+import { SkillStreamTrigger } from "@/components/skills";
 import { SKILL_NAMES } from "@/lib/skills/registry";
 import { GeoDistributionPanel } from "@/components/marketing/geo-distribution-panel";
 
@@ -150,7 +150,7 @@ function GeoCard({ item, onRefresh }: { item: GeoContentItem; onRefresh: () => v
             {geoWordCount} words · 可粘贴至 About / FAQ / Landing Page
           </span>
           <div className="flex items-center gap-2">
-            <SkillTrigger
+            <SkillStreamTrigger
               skillName={SKILL_NAMES.MARKETING_OPTIMIZE_GEO}
               displayName="AI 重新优化"
               description="重新生成更适合 AI 引擎引用的 GEO 版本与 FAQ"
@@ -163,7 +163,7 @@ function GeoCard({ item, onRefresh }: { item: GeoContentItem; onRefresh: () => v
                 targetKeywords: item.keywords,
               }}
               useCompanyProfile={true}
-              onSuccess={() => { onRefresh(); }}
+              onComplete={() => { onRefresh(); }}
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-[10px] text-[#D4AF37] hover:bg-[rgba(212,175,55,0.1)]"

@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { SkillTrigger } from "@/components/skills";
+import { SkillStreamTrigger } from "@/components/skills";
 import { SKILL_NAMES } from "@/lib/skills/registry";
 
 // ============================================
@@ -318,7 +318,7 @@ function ContentCard({ item, onRefresh }: { item: SeoAeoItem; onRefresh: () => v
               {/* AI Quick Actions */}
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex gap-2">
-                  <SkillTrigger
+                  <SkillStreamTrigger
                     skillName={SKILL_NAMES.MARKETING_FIX_SEO_ISSUES}
                     displayName="AI 修复 SEO"
                     description="自动修复标题、meta description、slug 等 SEO 缺陷"
@@ -334,12 +334,12 @@ function ContentCard({ item, onRefresh }: { item: SeoAeoItem; onRefresh: () => v
                       targetKeywords: item.keywords,
                     }}
                     useCompanyProfile={true}
-                    onSuccess={() => { onRefresh(); }}
+                    onComplete={() => { onRefresh(); }}
                     variant="outline"
                     size="sm"
                     className="flex-1 text-[11px] border-[rgba(239,68,68,0.4)] text-red-400 hover:bg-red-500/10"
                   />
-                  <SkillTrigger
+                  <SkillStreamTrigger
                     skillName={SKILL_NAMES.MARKETING_OPTIMIZE_GEO}
                     displayName="AI 优化 GEO"
                     description="生成适合 AI 引擎引用的 GEO 版本与 FAQ 结构化数据"
@@ -353,7 +353,7 @@ function ContentCard({ item, onRefresh }: { item: SeoAeoItem; onRefresh: () => v
                       currentAeoScore: item.aeoScore,
                     }}
                     useCompanyProfile={true}
-                    onSuccess={() => { onRefresh(); }}
+                    onComplete={() => { onRefresh(); }}
                     variant="outline"
                     size="sm"
                     className="flex-1 text-[11px] border-[rgba(212,175,55,0.4)] text-[#D4AF37] hover:bg-[#D4AF37]/10"

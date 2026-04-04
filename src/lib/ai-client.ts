@@ -254,6 +254,190 @@ export const aiClient = {
   },
 };
 
+// ==================== Streaming Support ====================
+
+interface StreamingChunk {
+  type: 'chunk' | 'done' | 'error' | 'usage';
+  content?: string;
+  model?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  error?: string;
+}
+
+/**
+ * 实时流式响应 - 边接收边发送
+ * 使用 curl --no-buffer 实现真正的实时流
+ */
+export function createStreamingResponse(
+  messages: ChatMessage[],
+  options: ChatCompletionOptions = {}
+): Response {
+  const apiKey = process.env.DASHSCOPE_API_KEY;
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "DASHSCOPE_API_KEY is not configured" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const {
+    model = "qwen-plus",
+    temperature = 0.3,
+    maxTokens = 4096,
+    topP = 0.8,
+    timeout = 300,
+  } = options;
+
+  // 构建实时流
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      let buffer = "";
+
+      const sendEvent = (data: StreamingChunk) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // controller 可能已关闭
+        }
+      };
+
+      // 构建请求体
+      const requestBody = JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        top_p: topP,
+        stream: true,
+      });
+
+      const ts = Date.now();
+      const tmpFile = join(tmpdir(), `dashscope-realtime-${ts}-${Math.random().toString(36).slice(2, 8)}.json`);
+      writeFileSync(tmpFile, requestBody, "utf-8");
+
+      console.log(`[realtime streaming] curl+stream, model=${model}, maxTokens=${maxTokens}`);
+
+      // 使用 --no-buffer 实现实时流
+      const proc = spawn("curl", [
+        "-s", "-S",
+        "-N",  // --no-buffer: 禁用缓冲，实时输出
+        "--max-time", String(timeout),
+        "-X", "POST",
+        DASHSCOPE_BASE_URL,
+        "-H", "Content-Type: application/json",
+        "-H", `Authorization: Bearer ${apiKey}`,
+        "--data-binary", `@${tmpFile}`,
+      ], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let fullContent = "";
+      let finalModel = model;
+      let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      let settled = false;
+
+      // 处理 stdout 数据流 - 边接收边发送
+      proc.stdout.on("data", (chunk: Buffer) => {
+        if (settled) return;
+        buffer += chunk.toString("utf-8");
+
+        // 处理完整的 SSE 行
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // 保留不完整的行
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.model) finalModel = parsed.model;
+            if (parsed.usage) {
+              usage = {
+                promptTokens: parsed.usage.prompt_tokens || 0,
+                completionTokens: parsed.usage.completion_tokens || 0,
+                totalTokens: parsed.usage.total_tokens || 0,
+              };
+            }
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta?.content) {
+              fullContent += delta.content;
+              // 实时发送给客户端
+              sendEvent({ type: 'chunk', content: delta.content });
+            }
+          } catch {
+            /* skip malformed chunks */
+          }
+        }
+      });
+
+      // 处理错误
+      proc.stderr.on("data", (chunk: Buffer) => {
+        console.error("[realtime streaming] stderr:", chunk.toString());
+      });
+
+      // 处理完成
+      proc.on("close", (code) => {
+        if (settled) return;
+        settled = true;
+
+        // 清理临时文件
+        try { unlinkSync(tmpFile); } catch { /* ignore */ }
+
+        if (code !== 0) {
+          sendEvent({ type: 'error', error: `curl exited with code ${code}` });
+        } else {
+          sendEvent({ type: 'done', content: fullContent, model: finalModel });
+          sendEvent({ type: 'usage', usage });
+        }
+
+        console.log(`[realtime streaming] done: ${fullContent.length} chars, ${Date.now() - ts}ms`);
+
+        try {
+          controller.close();
+        } catch {
+          // controller 可能已关闭
+        }
+      });
+
+      proc.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        console.error("[realtime streaming] spawn error:", err);
+        sendEvent({ type: 'error', error: err.message });
+        try { unlinkSync(tmpFile); } catch { /* ignore */ }
+        try { controller.close(); } catch { /* ignore */ }
+      });
+
+      // 设置超时保护
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill("SIGTERM");
+          sendEvent({ type: 'error', error: 'Request timeout' });
+          try { unlinkSync(tmpFile); } catch { /* ignore */ }
+          try { controller.close(); } catch { /* ignore */ }
+        }
+      }, (timeout + 30) * 1000);
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no", // 禁用 Nginx 缓冲
+    },
+  });
+}
+
 // ==================== 企业能力画像分析 Prompt ====================
 
 const COMPANY_PROFILE_SYSTEM_PROMPT = `你是一个专业的B2B企业分析师，擅长从企业资料中提炼企业能力画像。
