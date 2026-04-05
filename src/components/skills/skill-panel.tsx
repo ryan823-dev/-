@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { getAvailableSkills } from '@/actions/skills';
 import { SKILL_NAMES } from '@/lib/skills/registry';
-import { SkillTrigger } from './skill-trigger';
+import { SkillStreamTrigger } from './skill-stream-trigger';
 import type { SkillEngine } from '@/lib/skills/types';
 
 // ==================== Types ====================
@@ -163,7 +163,7 @@ export function SkillPanel({
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-[#D4AF37]" />
         <h3 className="font-bold text-[#0B1B2B]">
-          AI Skills
+          AI Skills (流式)
         </h3>
         <span className="text-xs text-slate-400">
           {engine === 'radar' ? '获客雷达' : '增长系统'}
@@ -196,15 +196,15 @@ export function SkillPanel({
                 </div>
               </div>
 
-              <SkillTrigger
+              <SkillStreamTrigger
                 skillName={skill.name}
                 displayName="执行"
                 entityType={entityType}
                 entityId={entityId}
                 input={input}
                 evidenceIds={evidenceIds}
-                onSuccess={(result) => {
-                  onSkillComplete?.(skill.name, result.versionId);
+                onComplete={(versionId) => {
+                  onSkillComplete?.(skill.name, versionId);
                 }}
                 variant="ghost"
                 size="sm"

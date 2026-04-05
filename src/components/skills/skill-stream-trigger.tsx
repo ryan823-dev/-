@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { executeSkillStream } from '@/actions/skills';
+import { executeSkillStream } from '@/lib/skills/client';
 import type { SkillRequest } from '@/lib/skills/types';
 
 // ==================== Types ====================

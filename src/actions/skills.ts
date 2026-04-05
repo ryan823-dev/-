@@ -98,75 +98,7 @@ export async function getSkillInfo(skillName: string): Promise<{
   };
 }
 
-// ==================== Streaming Actions ====================
-
-interface StreamingOptions {
-  onChunk?: (content: string) => void;
-  onDone?: (fullContent: string) => void;
-  onError?: (error: Error) => void;
-}
-
-/**
- * 执行单个 Skill (流式模式)
- * 实时接收 AI 生成的内容片段
- */
-export async function executeSkillStream(
-  skillName: string,
-  request: SkillRequest,
-  options: StreamingOptions
-): Promise<void> {
-  const session = await getSession();
-  
-  const response = await fetch(`/api/ai/skills/${skillName}/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Stream failed');
-  }
-  
-  if (!response.body) {
-    throw new Error('No response body');
-  }
-  
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-      
-      buffer += decoder.decode(value, { stream: true });
-      
-      // 处理 SSE 事件
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const event = JSON.parse(line.slice(6));
-            
-            if (event.type === 'chunk' && event.content) {
-              options.onChunk?.(event.content);
-            } else if (event.type === 'done') {
-              options.onDone?.(event.content || '');
-            } else if (event.type === 'error') {
-              options.onError?.(new Error(event.error || 'Stream error'));
-            }
-          } catch {
-            // 跳过解析失败的行
-          }
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
+// ！！！注意！！！
+// executeSkillStream 已移动到 @/lib/skills/client.ts
+// 以解决 Next.js Server Action 不支持流式返回的问题
+// 这样在客户端组件中直接调用 fetch 相对路径会更稳定且符合 SSE 标准
