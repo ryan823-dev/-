@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, Building2, Target, TrendingUp, Zap, Globe, Brain, CheckCircle2, Users, BarChart3, MessageSquare } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: 'VertaX 客户案例｜如何帮助企业打开全球市场',
@@ -159,9 +160,11 @@ const cases = [
 
 export default function CasesPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.cases} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
@@ -368,5 +371,6 @@ export default function CasesPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

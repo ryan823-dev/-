@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, CheckCircle2, XCircle, Building2, Factory, Zap, Shield, Globe, Users, TrendingUp, Target } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: '哪些企业适合 VertaX - 适用客户分析 | VertaX',
@@ -93,9 +94,11 @@ const decisionChecklist = [
 
 export default function WhoIsVertaxForPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.whoIsVertaxFor} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
@@ -295,5 +298,6 @@ export default function WhoIsVertaxForPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

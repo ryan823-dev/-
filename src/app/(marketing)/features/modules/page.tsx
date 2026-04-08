@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, Brain, Target, TrendingUp, Globe, MessageSquare, Building2, Layers, Database, Search, Send, BarChart3, Users, FileText, Zap, Shield, CheckCircle2 } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: 'VertaX 六大模块全景图 - 决策中心、知识引擎、获客雷达、增长系统、声量枢纽、推进中台 | VertaX',
@@ -123,9 +124,11 @@ const colorMap: Record<string, { bg: string; text: string; border: string }> = {
 
 export default function ModulesPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.featuresModules} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
@@ -281,5 +284,6 @@ export default function ModulesPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, Search, Brain, Target, TrendingUp, Zap, Globe, MessageSquare, BookOpen } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: 'AEO/GEO 与 B2B 出海获客的关系 - AI 搜索优化指南 | VertaX',
@@ -98,9 +99,11 @@ const howToDo = [
 
 export default function AeoGeoB2bPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.aeoGeoB2b} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
@@ -325,5 +328,6 @@ export default function AeoGeoB2bPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

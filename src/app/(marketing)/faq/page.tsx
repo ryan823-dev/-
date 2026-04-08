@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, MessageSquare, Users, Target, Zap, Shield, Globe, BookOpen, Search, MessageCircle, DollarSign, Clock, Rocket, ChevronRight } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: 'VertaX 常见问题 FAQ - 价格、周期、适用行业等 | VertaX',
@@ -130,6 +131,7 @@ const faqSchema = {
 export default function FaqPage() {
   return (
     <>
+      <BreadcrumbSchema items={breadcrumbPaths.faq} />
       {/* JSON-LD FAQ Schema */}
       <script
         type="application/ld+json"

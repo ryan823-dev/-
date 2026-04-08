@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, Building2, Globe, Brain, Target, Zap, Shield, MessageSquare } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: 'VertaX 是什么 - 出海获客智能体 | VertaX',
@@ -79,6 +80,7 @@ const faqData = [
 export default function WhatIsVertaxPage() {
   return (
     <>
+      <BreadcrumbSchema items={breadcrumbPaths.whatIsVertax} />
       {/* JSON-LD 结构化数据 */}
       <script
         type="application/ld+json"

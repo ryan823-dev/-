@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ArrowRight, Building2, Zap, Target, Globe, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: '解决方案 - VertaX 行业化 GTM 方案',
@@ -128,9 +129,11 @@ const commonBenefits = [
 
 export default function SolutionsPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.solutions} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
@@ -313,5 +316,6 @@ export default function SolutionsPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ArrowRight,
 } from 'lucide-react';
+import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
 
 export const metadata: Metadata = {
   title: '功能特性 - VertaX 六大核心模块 | VertaX',
@@ -101,8 +102,10 @@ const capabilities = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-      {/* Navigation */}
+    <>
+      <BreadcrumbSchema items={breadcrumbPaths.features} />
+      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
+        {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -256,5 +259,6 @@ export default function FeaturesPage() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
