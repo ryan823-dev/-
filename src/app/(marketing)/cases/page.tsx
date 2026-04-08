@@ -1,6 +1,9 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { ArrowRight, Building2, Target, TrendingUp, Zap, Globe, Brain, CheckCircle2, Users, BarChart3, MessageSquare } from 'lucide-react';
 import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
+import { colors } from '@/lib/design-tokens';
+import { MarketingNav, MarketingFooter, SectionHeader, Card, GoldButton, OutlineButton, GoldBadge } from '@/components/marketing/design-system';
 
 export const metadata: Metadata = {
   title: 'VertaX 客户案例｜如何帮助企业打开全球市场',
@@ -162,215 +165,208 @@ export default function CasesPage() {
   return (
     <>
       <BreadcrumbSchema items={breadcrumbPaths.cases} />
-      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-        {/* Navigation */}
-        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight">VertaX</span>
+      <div className="min-h-screen" style={{ background: colors.bg.primary, fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif' }}>
+        <MarketingNav />
+
+        {/* Hero Section */}
+        <section
+          className="pt-16 pb-12 px-4 sm:px-6"
+          style={{ background: 'linear-gradient(180deg, #0B1220 0%, #0D1526 50%, #F7F3EA 100%)' }}
+        >
+          <div className="max-w-3xl mx-auto">
+            <GoldBadge icon={<Building2 className="w-3.5 h-3.5" />}>
+              客户案例
+            </GoldBadge>
+            <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-6 text-white mt-6">
+              VertaX 客户案例｜如何帮助企业打开全球市场
+            </h1>
+            <p className="text-lg text-gray-400">
+              制造业、工业品、技术服务型企业的出海获客实践。每个案例都来自真实客户，成果真实、克制、可验证。
+            </p>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <a href="/" className="text-gray-400 hover:text-white transition-colors">首页</a>
-            <a href="/features" className="text-gray-400 hover:text-white transition-colors">功能</a>
-            <a href="/cases" className="text-white font-medium">案例</a>
-            <a href="/contact" className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-4 py-1.5 rounded-lg transition-colors">
-              预约演示
-            </a>
-          </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* Hero Section */}
-      <header className="pt-16 pb-12 px-6 border-b border-white/5">
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full px-4 py-1 text-xs font-medium mb-6">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>客户案例</span>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-6">
-            VertaX 客户案例｜如何帮助企业打开全球市场
-          </h1>
-          <p className="text-xl text-gray-400">
-            制造业、工业品、技术服务型企业的出海获客实践。每个案例都来自真实客户，成果真实、克制、可验证。
-          </p>
-        </div>
-      </header>
-
-      {/* Case List */}
-      <section className="py-16 px-6">
-        <div className="max-w-4xl mx-auto space-y-16">
-          {cases.map((caseItem, index) => (
-            <article key={caseItem.id} id={caseItem.id} className="scroll-mt-20">
-              {/* Case Header */}
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded">{caseItem.industry}</span>
-                </div>
-                <h2 className="text-xl font-bold mb-2">{caseItem.title}</h2>
-                <p className="text-gray-400">{caseItem.summary}</p>
-              </div>
-
-              {/* Client Background */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-cyan-400" />
-                  客户背景
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">客户类型</p>
-                    <p className="text-sm">{caseItem.client.type}</p>
-                  </div>
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">企业规模</p>
-                    <p className="text-sm">{caseItem.client.scale}</p>
-                  </div>
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">目标市场</p>
-                    <p className="text-sm">{caseItem.client.market}</p>
-                  </div>
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">产品类型</p>
-                    <p className="text-sm">{caseItem.client.product}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Problem */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-red-400" />
-                  面临问题
-                </h3>
-                <ul className="space-y-2">
-                  {caseItem.problem.map((p, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                      <span className="text-red-400/60 mt-1">•</span>
-                      <span>{p}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Modules Used */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-cyan-400" />
-                  使用模块
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {caseItem.modules.map(m => (
-                    <span key={m} className="text-sm bg-cyan-500/10 text-cyan-400 px-3 py-1 rounded-lg">
-                      {m}
+        {/* Case List */}
+        <section className="py-16 px-4 sm:px-6" style={{ background: colors.bg.primary }}>
+          <div className="max-w-4xl mx-auto space-y-16">
+            {cases.map((caseItem, index) => (
+              <article key={caseItem.id} id={caseItem.id} className="scroll-mt-20">
+                {/* Case Header */}
+                <Card className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span
+                      className="text-xs px-2 py-1 rounded"
+                      style={{
+                        background: `rgba(${colors.brand.goldRgb},0.1)`,
+                        color: colors.brand.gold,
+                      }}
+                    >
+                      {caseItem.industry}
                     </span>
-                  ))}
+                  </div>
+                  <h2 className="text-xl font-bold mb-2" style={{ color: colors.text.primary }}>{caseItem.title}</h2>
+                  <p style={{ color: colors.text.secondary }}>{caseItem.summary}</p>
+                </Card>
+
+                {/* Client Background */}
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <Users className="w-5 h-5" style={{ color: colors.brand.gold }} />
+                    客户背景
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.entries(caseItem.client).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="rounded-lg p-3"
+                        style={{
+                          background: colors.bg.secondary,
+                          border: `1px solid ${colors.border.light}`,
+                        }}
+                      >
+                        <p className="text-xs mb-1" style={{ color: colors.text.muted }}>
+                          {key === 'type' ? '客户类型' : key === 'scale' ? '企业规模' : key === 'market' ? '目标市场' : '产品类型'}
+                        </p>
+                        <p className="text-sm" style={{ color: colors.text.primary }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Solution */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-cyan-400" />
-                  解决方案
-                </h3>
-                <div className="space-y-3">
-                  {caseItem.solution.map((s, i) => (
-                    <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-4">
-                      <h4 className="text-sm font-semibold mb-1">{s.title}</h4>
-                      <p className="text-sm text-gray-400">{s.desc}</p>
-                    </div>
-                  ))}
+                {/* Problem */}
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <Target className="w-5 h-5" style={{ color: '#F59E0B' }} />
+                    面临问题
+                  </h3>
+                  <ul className="space-y-2">
+                    {caseItem.problem.map((p, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm" style={{ color: colors.text.secondary }}>
+                        <span className="mt-1" style={{ color: '#F59E0B' }}>•</span>
+                        <span>{p}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
 
-              {/* Results */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-emerald-400" />
-                  阶段成果
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {caseItem.results.map((r, i) => (
-                    <div key={i} className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-4 text-center">
-                      <p className="text-lg font-bold text-emerald-400 mb-1">{r.value}</p>
-                      <p className="text-xs text-gray-400 mb-1">{r.metric}</p>
-                      <p className="text-xs text-gray-500">{r.detail}</p>
-                    </div>
-                  ))}
+                {/* Modules Used */}
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <Zap className="w-5 h-5" style={{ color: colors.brand.gold }} />
+                    使用模块
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {caseItem.modules.map(m => (
+                      <span
+                        key={m}
+                        className="text-sm px-3 py-1 rounded-lg"
+                        style={{
+                          background: `rgba(${colors.brand.goldRgb},0.1)`,
+                          color: colors.brand.gold,
+                        }}
+                      >
+                        {m}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Lessons */}
-              <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-xl p-5">
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-cyan-400" />
-                  适合借鉴的经验
-                </h3>
-                <ul className="space-y-2">
-                  {caseItem.lessons.map((l, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                      <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                      <span>{l}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                {/* Solution */}
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <Brain className="w-5 h-5" style={{ color: colors.brand.gold }} />
+                    解决方案
+                  </h3>
+                  <div className="space-y-3">
+                    {caseItem.solution.map((s, i) => (
+                      <Card key={i}>
+                        <h4 className="text-sm font-semibold mb-1" style={{ color: colors.text.primary }}>{s.title}</h4>
+                        <p className="text-sm" style={{ color: colors.text.secondary }}>{s.desc}</p>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Divider */}
-              {index < cases.length - 1 && (
-                <div className="border-t border-white/5 mt-12" />
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
+                {/* Results */}
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <BarChart3 className="w-5 h-5" style={{ color: '#10B981' }} />
+                    阶段成果
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {caseItem.results.map((r, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg p-4 text-center"
+                        style={{
+                          background: 'rgba(16,185,129,0.05)',
+                          border: '1px solid rgba(16,185,129,0.1)',
+                        }}
+                      >
+                        <p className="text-lg font-bold mb-1" style={{ color: '#10B981' }}>{r.value}</p>
+                        <p className="text-xs mb-1" style={{ color: colors.text.secondary }}>{r.metric}</p>
+                        <p className="text-xs" style={{ color: colors.text.muted }}>{r.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-      {/* CTA Section */}
-      <section className="py-20 px-6 bg-white/[0.02] border-t border-white/5">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl font-bold mb-4">
-            想要成为下一个成功案例？
-          </h2>
-          <p className="text-gray-400 mb-8">
-            预约演示，获取你行业的 GTM 路径样板与 ICP 示例。
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/contact"
-              className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 rounded-lg transition-colors inline-flex items-center gap-2"
-            >
-              预约演示 <ArrowRight className="w-4 h-4" />
-            </a>
-            <a
-              href="/faq"
-              className="border border-white/10 text-gray-300 hover:bg-white/5 px-8 py-3 rounded-lg transition-colors font-medium"
-            >
-              常见问题
-            </a>
+                {/* Lessons */}
+                <div
+                  className="rounded-xl p-5"
+                  style={{
+                    background: `rgba(${colors.brand.goldRgb},0.05)`,
+                    border: `1px solid rgba(${colors.brand.goldRgb},0.1)`,
+                  }}
+                >
+                  <h3 className="text-base font-semibold mb-3 flex items-center gap-2" style={{ color: colors.text.primary }}>
+                    <CheckCircle2 className="w-5 h-5" style={{ color: colors.brand.gold }} />
+                    适合借鉴的经验
+                  </h3>
+                  <ul className="space-y-2">
+                    {caseItem.lessons.map((l, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm" style={{ color: colors.text.secondary }}>
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.brand.gold }} />
+                        <span>{l}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Divider */}
+                {index < cases.length - 1 && (
+                  <div className="border-t mt-12" style={{ borderColor: colors.border.light }} />
+                )}
+              </article>
+            ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
+        {/* CTA Section */}
+        <section
+          className="py-20 px-4 sm:px-6"
+          style={{ background: colors.bg.darkGradient }}
+        >
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              想要成为下一个成功案例？
+            </h2>
+            <p className="text-gray-400 mb-8">
+              预约演示，获取你行业的 GTM 路径样板与 ICP 示例。
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <GoldButton href="/contact" size="large" icon={<ArrowRight className="w-4 h-4" />}>
+                预约演示
+              </GoldButton>
+              <OutlineButton href="/faq">
+                常见问题
+              </OutlineButton>
             </div>
-            <span className="text-sm font-medium">VertaX</span>
-            <span className="text-xs text-gray-600 ml-2">© {new Date().getFullYear()} VERTAX LIMITED</span>
           </div>
-          <div className="flex items-center gap-6 text-xs text-gray-500">
-            <span>contact@vertax.top</span>
-            <a href="/faq" className="hover:text-gray-300 transition-colors">常见问题</a>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </section>
+
+        <MarketingFooter />
+      </div>
     </>
   );
 }

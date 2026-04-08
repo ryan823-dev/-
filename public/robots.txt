@@ -19,7 +19,7 @@ Disallow: /static/
 # 禁止收录认证相关页面
 Disallow: /auth/
 Disallow: /login
-Disallow: /signup
+Disallow: /register
 
 # 禁止收录文档和内部工具
 Disallow: /docs/

@@ -19,6 +19,30 @@ export const metadata: Metadata = {
       'en': '/en',
     },
   },
+  // Open Graph - 社交媒体分享优化
+  openGraph: {
+    title: 'VertaX · 面向中国企业出海的智能获客平台',
+    description: 'VertaX 是面向中国企业出海的智能获客平台，围绕知识引擎、内容增长、商机挖掘、品牌声量、协同推进与经营决策六大能力，帮助企业建立可持续的全球增长体系。',
+    url: SITE_URL,
+    siteName: 'VertaX',
+    locale: 'zh_CN',
+    type: 'website',
+    images: [
+      {
+        url: `${SITE_URL}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: 'VertaX - 出海获客智能体',
+      },
+    ],
+  },
+  // Twitter Cards
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VertaX · 面向中国企业出海的智能获客平台',
+    description: 'VertaX 是面向中国企业出海的智能获客平台，帮助企业建立可持续的全球增长体系。',
+    images: [`${SITE_URL}/og-image.png`],
+  },
   // 百度站点验证 - 必须使用 other 字段
   other: {
     "baidu-site-verification": "codeva-Y0nSSpkmX1",

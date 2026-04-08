@@ -1,6 +1,9 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { ArrowRight, Building2, Zap, Target, Globe, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
+import { colors } from '@/lib/design-tokens';
+import { MarketingNav, MarketingFooter, SectionHeader, Card, GoldButton, OutlineButton, GoldBadge } from '@/components/marketing/design-system';
 
 export const metadata: Metadata = {
   title: '解决方案 - VertaX 行业化 GTM 方案',
@@ -131,191 +134,174 @@ export default function SolutionsPage() {
   return (
     <>
       <BreadcrumbSchema items={breadcrumbPaths.solutions} />
-      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-        {/* Navigation */}
-        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
+      <div className="min-h-screen" style={{ background: colors.bg.primary, fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif' }}>
+        <MarketingNav />
+
+        {/* Hero Section */}
+        <section
+          className="pt-16 pb-20 px-4 sm:px-6"
+          style={{ background: 'linear-gradient(180deg, #0B1220 0%, #0D1526 50%, #F7F3EA 100%)' }}
+        >
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-white">
+              行业化<span style={{ color: colors.brand.gold }}>解决方案</span>
+            </h1>
+            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
+              针对不同行业的特性与挑战，提供定制化的 GTM 增长方案。
+              <br />
+              <span className="text-sm text-gray-500">
+                已服务制造业、机器人、工业设备、新能源等多个行业。
+              </span>
+            </p>
+          </div>
+        </section>
+
+        {/* Common Benefits */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.primary }}>
+          <div className="max-w-6xl mx-auto">
+            <SectionHeader
+              badge="核心价值"
+              title="VertaX 核心价值"
+              align="center"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {commonBenefits.map((benefit) => (
+                <div key={benefit.title} className="text-center">
+                  <benefit.icon className="w-10 h-10 mx-auto mb-4" style={{ color: colors.brand.gold }} />
+                  <h3 className="text-base font-bold mb-2" style={{ color: colors.text.primary }}>{benefit.title}</h3>
+                  <p className="text-sm" style={{ color: colors.text.secondary }}>{benefit.description}</p>
+                </div>
+              ))}
             </div>
-            <span className="text-lg font-bold tracking-tight">VertaX</span>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <a href="/" className="text-gray-400 hover:text-white transition-colors">首页</a>
-            <a href="/features" className="text-gray-400 hover:text-white transition-colors">功能</a>
-            <a href="/pricing" className="text-gray-400 hover:text-white transition-colors">合作方案</a>
-            <a href="/about" className="text-gray-400 hover:text-white transition-colors">关于</a>
-            <a href="/blog" className="text-gray-400 hover:text-white transition-colors">博客</a>
-            <a href="/contact" className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-4 py-1.5 rounded-lg transition-colors">
-              预约演示
-            </a>
-          </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* Hero Section */}
-      <section className="pt-20 pb-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            行业化<span className="text-cyan-400">解决方案</span>
-          </h1>
-          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
-            针对不同行业的特性与挑战，提供定制化的 GTM 增长方案。
-            <br />
-            <span className="text-sm text-gray-500">
-              已服务制造业、机器人、工业设备、新能源等多个行业。
-            </span>
-          </p>
-        </div>
-      </section>
+        {/* Industry Solutions */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.secondary }}>
+          <div className="max-w-6xl mx-auto">
+            <SectionHeader
+              badge="行业方案"
+              title="行业解决方案"
+              align="center"
+            />
+            <div className="space-y-12">
+              {industries.map((industry, index) => (
+                <div
+                  key={industry.name}
+                  className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}
+                >
+                  {/* Left: Industry Info */}
+                  <Card>
+                    <div className="flex items-center gap-3 mb-6">
+                      <industry.icon className="w-10 h-10" style={{ color: colors.brand.gold }} />
+                      <div>
+                        <h3 className="text-2xl font-bold" style={{ color: colors.text.primary }}>{industry.name}</h3>
+                        <p className="text-sm" style={{ color: colors.text.secondary }}>{industry.description}</p>
+                      </div>
+                    </div>
 
-      {/* Common Benefits */}
-      <section className="py-20 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">VertaX 核心价值</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {commonBenefits.map((benefit) => (
-              <div key={benefit.title} className="text-center">
-                <benefit.icon className="w-10 h-10 text-cyan-400 mx-auto mb-4" />
-                <h3 className="text-base font-bold mb-2">{benefit.title}</h3>
-                <p className="text-sm text-gray-400">{benefit.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+                    <div className="mb-6">
+                      <h4 className="text-base font-bold mb-3" style={{ color: '#F59E0B' }}>行业挑战</h4>
+                      <ul className="space-y-2">
+                        {industry.challenges.map((challenge) => (
+                          <li key={challenge} className="flex items-start gap-2 text-sm" style={{ color: colors.text.primary }}>
+                            <span className="mt-1" style={{ color: '#F59E0B' }}>•</span>
+                            <span>{challenge}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
 
-      {/* Industry Solutions */}
-      <section className="py-20 px-6 bg-white/[0.02]">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">行业解决方案</h2>
-          <div className="space-y-12">
-            {industries.map((industry, index) => (
-              <div
-                key={industry.name}
-                className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}
-              >
-                {/* Left: Industry Info */}
-                <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <industry.icon className="w-10 h-10 text-cyan-400" />
                     <div>
-                      <h3 className="text-2xl font-bold">{industry.name}</h3>
-                      <p className="text-sm text-gray-400">{industry.description}</p>
+                      <h4 className="text-base font-bold mb-3" style={{ color: colors.brand.gold }}>VertaX 方案</h4>
+                      <ul className="space-y-2">
+                        {industry.solutions.map((solution) => (
+                          <li key={solution} className="flex items-start gap-2 text-sm" style={{ color: colors.text.primary }}>
+                            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.brand.gold }} />
+                            <span>{solution}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
+                  </Card>
 
-                  <div className="mb-6">
-                    <h4 className="text-base font-bold mb-3 text-red-400">行业挑战</h4>
-                    <ul className="space-y-2">
-                      {industry.challenges.map((challenge) => (
-                        <li key={challenge} className="flex items-start gap-2 text-sm text-gray-300">
-                          <span className="text-red-400 mt-1">•</span>
-                          <span>{challenge}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-base font-bold mb-3 text-cyan-400">VertaX 方案</h4>
-                    <ul className="space-y-2">
-                      {industry.solutions.map((solution) => (
-                        <li key={solution} className="flex items-start gap-2 text-sm text-gray-300">
-                          <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                          <span>{solution}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Right: Metrics */}
-                <div className="flex flex-col justify-center">
-                  <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-8">
-                    <h4 className="text-lg font-bold mb-6 text-cyan-400">客户成果</h4>
-                    <div className="space-y-6">
-                      <div>
-                        <div className="text-3xl font-bold text-white mb-1">
-                          {industry.metrics.leadsIncrease}
-                        </div>
-                        <div className="text-sm text-gray-400">线索数量增长</div>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white mb-1">
-                          {industry.metrics.responseRate}
-                        </div>
-                        <div className="text-sm text-gray-400">邮件回复率提升</div>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white mb-1">
-                          {industry.metrics.conversionTime}
-                        </div>
-                        <div className="text-sm text-gray-400">转化周期缩短</div>
-                      </div>
-                    </div>
-                    <a
-                      href="/contact"
-                      className="mt-8 block w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-3 rounded-lg text-center transition-colors"
+                  {/* Right: Metrics */}
+                  <div className="flex flex-col justify-center">
+                    <div
+                      className="rounded-2xl p-8"
+                      style={{
+                        background: `rgba(${colors.brand.goldRgb},0.08)`,
+                        border: `1px solid rgba(${colors.brand.goldRgb},0.2)`,
+                      }}
                     >
-                      获取该行业方案
-                    </a>
+                      <h4 className="text-lg font-bold mb-6" style={{ color: colors.brand.gold }}>客户成果</h4>
+                      <div className="space-y-6">
+                        <div>
+                          <div className="text-3xl font-bold text-white mb-1">
+                            {industry.metrics.leadsIncrease}
+                          </div>
+                          <div className="text-sm text-gray-400">线索数量增长</div>
+                        </div>
+                        <div>
+                          <div className="text-3xl font-bold text-white mb-1">
+                            {industry.metrics.responseRate}
+                          </div>
+                          <div className="text-sm text-gray-400">邮件回复率提升</div>
+                        </div>
+                        <div>
+                          <div className="text-3xl font-bold text-white mb-1">
+                            {industry.metrics.conversionTime}
+                          </div>
+                          <div className="text-sm text-gray-400">转化周期缩短</div>
+                        </div>
+                      </div>
+                      <Link
+                        href="/contact"
+                        className="mt-8 block w-full font-semibold py-3 rounded-lg text-center transition-colors"
+                        style={{
+                          background: colors.brand.gold,
+                          color: colors.bg.dark,
+                        }}
+                      >
+                        获取该行业方案
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            您的行业方案是什么？
-          </h2>
-          <p className="text-gray-400 mb-8">
-            预约演示，获取为您行业定制的 GTM 路径样板与 ICP 示例。
-            <br />
-            <span className="text-sm text-gray-500">
-              我们会根据您的产品特性、目标市场、竞争格局提供定制化方案。
-            </span>
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/contact"
-              className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 rounded-lg transition-colors inline-flex items-center gap-2"
-            >
-              预约演示 <ArrowRight className="w-4 h-4" />
-            </a>
-            <a
-              href="/features"
-              className="border border-white/10 text-gray-300 hover:bg-white/5 px-8 py-3 rounded-lg transition-colors font-medium"
-            >
-              了解功能
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
+              ))}
             </div>
-            <span className="text-sm font-medium">VertaX</span>
-            <span className="text-xs text-gray-600 ml-2">© {new Date().getFullYear()} VERTAX LIMITED</span>
           </div>
-          <div className="flex items-center gap-6 text-xs text-gray-500">
-            <span>contact@vertax.top</span>
-            <a href="https://tower.vertax.top" className="hover:text-gray-300 transition-colors">管理后台</a>
+        </section>
+
+        {/* CTA Section */}
+        <section
+          className="py-20 sm:py-24 px-4 sm:px-6"
+          style={{ background: colors.bg.darkGradient }}
+        >
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+              您的行业方案是什么？
+            </h2>
+            <p className="text-gray-400 mb-8">
+              预约演示，获取为您行业定制的 GTM 路径样板与 ICP 示例。
+              <br />
+              <span className="text-sm text-gray-500">
+                我们会根据您的产品特性、目标市场、竞争格局提供定制化方案。
+              </span>
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <GoldButton href="/contact" size="large" icon={<ArrowRight className="w-4 h-4" />}>
+                预约演示
+              </GoldButton>
+              <OutlineButton href="/features">
+                了解功能
+              </OutlineButton>
+            </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </section>
+
+        <MarketingFooter />
+      </div>
     </>
   );
 }

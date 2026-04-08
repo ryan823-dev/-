@@ -1,6 +1,9 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { Check, ArrowRight, Building2, Rocket, Handshake } from 'lucide-react';
 import { BreadcrumbSchema, breadcrumbPaths } from '@/components/seo/breadcrumb-schema';
+import { colors } from '@/lib/design-tokens';
+import { MarketingNav, MarketingFooter, SectionHeader, Card, GoldButton, OutlineButton, GoldBadge } from '@/components/marketing/design-system';
 
 export const metadata: Metadata = {
   title: '合作方案 - VertaX GTM Intelligence OS',
@@ -31,6 +34,7 @@ const tiers = [
       '无需 IT 团队，注册即用',
     ],
     note: '适合快速验证 GTM 数字化价值',
+    highlight: false,
   },
   {
     icon: Building2,
@@ -50,6 +54,7 @@ const tiers = [
       '季度业务复盘',
     ],
     note: '最受欢迎的企业选择',
+    highlight: true,
   },
   {
     icon: Handshake,
@@ -69,6 +74,7 @@ const tiers = [
       '7x24 技术支持',
     ],
     note: '适合有合规与定制化需求的大型企业',
+    highlight: false,
   },
 ];
 
@@ -99,206 +105,199 @@ export default function PricingPage() {
   return (
     <>
       <BreadcrumbSchema items={breadcrumbPaths.pricing} />
-      <div className="min-h-screen bg-[#0a0a14] text-gray-100">
-        {/* Navigation */}
-        <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-cyan-500 rounded-md flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
+      <div className="min-h-screen" style={{ background: colors.bg.primary, fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif' }}>
+        <MarketingNav />
+
+        {/* Hero Section */}
+        <section
+          className="pt-16 pb-20 px-4 sm:px-6"
+          style={{ background: 'linear-gradient(180deg, #0B1220 0%, #0D1526 50%, #F7F3EA 100%)' }}
+        >
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-white">
+              企业级<span style={{ color: colors.brand.gold }}>合作方案</span>
+            </h1>
+            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-8">
+              VertaX 采用商务洽谈制，根据企业规模、行业特性、部署需求定制方案与报价。
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <GoldButton href="/contact" size="large" icon={<ArrowRight className="w-4 h-4" />}>
+                预约演示
+              </GoldButton>
+              <OutlineButton href="#process">
+                了解合作流程
+              </OutlineButton>
             </div>
-            <span className="text-lg font-bold tracking-tight">VertaX</span>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <a href="/" className="text-gray-400 hover:text-white transition-colors">首页</a>
-            <a href="/features" className="text-gray-400 hover:text-white transition-colors">功能</a>
-            <a href="/pricing" className="text-white font-medium">合作方案</a>
-            <a href="/about" className="text-gray-400 hover:text-white transition-colors">关于</a>
-            <a href="/contact" className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-4 py-1.5 rounded-lg transition-colors">
-              预约演示
-            </a>
-          </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* Hero Section */}
-      <section className="pt-20 pb-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            企业级<span className="text-cyan-400">合作方案</span>
-          </h1>
-          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-            VertaX 采用商务洽谈制，根据企业规模、行业特性、部署需求定制方案与报价。
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/contact"
-              className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 rounded-lg transition-colors inline-flex items-center gap-2"
-            >
-              预约演示 <ArrowRight className="w-4 h-4" />
-            </a>
-            <a
-              href="#process"
-              className="border border-white/10 text-gray-300 hover:bg-white/5 px-8 py-3 rounded-lg transition-colors font-medium"
-            >
-              了解合作流程
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Tiers */}
-      <section className="py-20 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">三种服务层级</h2>
-          <p className="text-gray-500 text-center mb-12 text-sm">根据企业需求灵活选择，支持升级与定制</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {tiers.map((tier) => (
-              <div
-                key={tier.name}
-                className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 hover:border-cyan-500/20 transition-colors"
-              >
-                <tier.icon className="w-10 h-10 text-cyan-400 mb-6" />
-                <h3 className="text-xl font-bold mb-2">{tier.name}</h3>
-                <p className="text-sm text-gray-400 mb-2">{tier.description}</p>
-                <p className="text-xs text-cyan-500/70 mb-6">{tier.bestFor}</p>
-                <ul className="space-y-3 mb-8">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-gray-300">
-                      <Check className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 mb-6">
-                  <p className="text-xs text-cyan-400 text-center">{tier.note}</p>
-                </div>
-                <a
-                  href="/contact"
-                  className="block w-full py-3 rounded-lg text-center font-semibold border border-white/10 hover:bg-white/5 text-gray-300 transition-colors"
+        {/* Tiers */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.primary }}>
+          <div className="max-w-6xl mx-auto">
+            <SectionHeader
+              badge="服务层级"
+              title="三种服务层级"
+              subtitle="根据企业需求灵活选择，支持升级与定制"
+              align="center"
+            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {tiers.map((tier) => (
+                <div
+                  key={tier.name}
+                  className="rounded-2xl p-8 transition-all hover:-translate-y-1"
+                  style={{
+                    background: tier.highlight ? `linear-gradient(180deg, rgba(${colors.brand.goldRgb},0.1) 0%, rgba(${colors.brand.goldRgb},0.02) 100%)` : colors.bg.secondary,
+                    border: `1px solid ${tier.highlight ? colors.border.medium : colors.border.light}`,
+                    boxShadow: tier.highlight ? `0 0 30px rgba(${colors.brand.goldRgb},0.1)` : '0 4px 20px rgba(0,0,0,0.03)',
+                  }}
                 >
-                  咨询该方案
-                </a>
-              </div>
-            ))}
+                  <tier.icon className="w-10 h-10 mb-6" style={{ color: colors.brand.gold }} />
+                  <h3 className="text-xl font-bold mb-2" style={{ color: colors.text.primary }}>{tier.name}</h3>
+                  <p className="text-sm mb-2" style={{ color: colors.text.secondary }}>{tier.description}</p>
+                  <p className="text-xs mb-6" style={{ color: colors.brand.gold }}>{tier.bestFor}</p>
+                  <ul className="space-y-3 mb-8">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: colors.text.primary }}>
+                        <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.brand.gold }} />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div
+                    className="rounded-lg p-3 mb-6"
+                    style={{
+                      background: `rgba(${colors.brand.goldRgb},0.08)`,
+                      border: `1px solid rgba(${colors.brand.goldRgb},0.15)`,
+                    }}
+                  >
+                    <p className="text-xs text-center" style={{ color: colors.brand.gold }}>{tier.note}</p>
+                  </div>
+                  <Link
+                    href="/contact"
+                    className="block w-full py-3 rounded-lg text-center font-semibold transition-colors"
+                    style={{
+                      background: tier.highlight ? colors.brand.gold : 'transparent',
+                      color: tier.highlight ? colors.bg.dark : colors.text.primary,
+                      border: tier.highlight ? 'none' : `1px solid ${colors.border.medium}`,
+                    }}
+                  >
+                    咨询该方案
+                  </Link>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Pricing Note */}
-      <section className="py-20 px-6 bg-white/[0.02]">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-6">关于报价</h2>
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8">
-            <p className="text-gray-300 text-lg leading-relaxed mb-6">
-              VertaX 是企业级 GTM 基础设施，我们采用<span className="text-cyan-400 font-semibold">商务洽谈制</span>，
-              而非标准化订阅价格。这是因为每家企业的行业特性、目标市场、团队规模、合规需求都不同，
-              需要定制配置方案。
-            </p>
-            <p className="text-gray-400 text-sm leading-relaxed">
-              我们建议您预约演示，在了解您的具体需求后，我们会提供详细的配置方案与报价。
-              全功能企业版首年投入约在<span className="text-cyan-400 font-medium">20 万元左右</span>，
-              具体价格根据配置与服务范围浮动。
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Process */}
-      <section id="process" className="py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">合作流程</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {processSteps.map((step) => (
-              <div key={step.step} className="text-center">
-                <div className="text-4xl font-bold text-cyan-500/30 mb-4">{step.step}</div>
-                <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-                <p className="text-sm text-gray-400">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Deployment Options */}
-      <section className="py-20 px-6 bg-white/[0.02]">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-10">部署方式</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-8">
-              <h3 className="text-lg font-bold mb-2">SaaS 云端版</h3>
-              <p className="text-sm text-gray-400 leading-relaxed mb-4">
-                快速部署，免运维。数据加密存储，支持随时导出。
+        {/* Pricing Note */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.secondary }}>
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl md:text-3xl font-bold mb-6" style={{ color: colors.text.primary }}>关于报价</h2>
+            <Card>
+              <p className="text-lg leading-relaxed mb-6" style={{ color: colors.text.primary }}>
+                VertaX 是企业级 GTM 基础设施，我们采用<span style={{ color: colors.brand.gold, fontWeight: 600 }}>商务洽谈制</span>，
+                而非标准化订阅价格。这是因为每家企业的行业特性、目标市场、团队规模、合规需求都不同，
+                需要定制配置方案。
               </p>
-              <ul className="space-y-2 text-sm text-gray-500">
-                <li>• 云端托管，自动更新</li>
-                <li>• 按需配置，灵活扩展</li>
-                <li>• 企业级安全防护</li>
-              </ul>
-            </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-8">
-              <h3 className="text-lg font-bold mb-2">私有部署版</h3>
-              <p className="text-sm text-gray-400 leading-relaxed mb-4">
-                数据本地化，完全自主可控。适合有合规要求的企业。
+              <p className="text-sm leading-relaxed" style={{ color: colors.text.secondary }}>
+                我们建议您预约演示，在了解您的具体需求后，我们会提供详细的配置方案与报价。
+                全功能企业版首年投入约在<span style={{ color: colors.brand.gold, fontWeight: 500 }}>20 万元左右</span>，
+                具体价格根据配置与服务范围浮动。
               </p>
-              <ul className="space-y-2 text-sm text-gray-500">
-                <li>• 本地服务器部署</li>
-                <li>• 数据完全自主</li>
-                <li>• 深度定制集成</li>
-              </ul>
+            </Card>
+          </div>
+        </section>
+
+        {/* Process */}
+        <section id="process" className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.primary }}>
+          <div className="max-w-4xl mx-auto">
+            <SectionHeader
+              badge="合作流程"
+              title="合作流程"
+              align="center"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {processSteps.map((step) => (
+                <div key={step.step} className="text-center">
+                  <div
+                    className="text-4xl font-bold mb-4"
+                    style={{ color: `rgba(${colors.brand.goldRgb},0.3)` }}
+                  >
+                    {step.step}
+                  </div>
+                  <h3 className="text-lg font-bold mb-2" style={{ color: colors.text.primary }}>{step.title}</h3>
+                  <p className="text-sm" style={{ color: colors.text.secondary }}>{step.description}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            准备好开始了吗？
-          </h2>
-          <p className="text-gray-400 mb-8">
-            预约演示，了解 VertaX 如何帮助您的企业实现海外增长。
-            <br />
-            <span className="text-sm text-gray-500">
-              我们会为您准备行业 GTM 路径样板与 ICP 示例。
-            </span>
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/contact"
-              className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 rounded-lg transition-colors inline-flex items-center gap-2"
-            >
-              预约演示 <ArrowRight className="w-4 h-4" />
-            </a>
-            <a
-              href="/features"
-              className="border border-white/10 text-gray-300 hover:bg-white/5 px-8 py-3 rounded-lg transition-colors font-medium"
-            >
-              了解功能
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center">
-              <span className="text-black font-bold text-xs">V</span>
+        {/* Deployment Options */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.secondary }}>
+          <div className="max-w-4xl mx-auto">
+            <SectionHeader
+              badge="部署方式"
+              title="部署方式"
+              align="center"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <h3 className="text-lg font-bold mb-2" style={{ color: colors.text.primary }}>SaaS 云端版</h3>
+                <p className="text-sm leading-relaxed mb-4" style={{ color: colors.text.secondary }}>
+                  快速部署，免运维。数据加密存储，支持随时导出。
+                </p>
+                <ul className="space-y-2 text-sm" style={{ color: colors.text.muted }}>
+                  <li>• 云端托管，自动更新</li>
+                  <li>• 按需配置，灵活扩展</li>
+                  <li>• 企业级安全防护</li>
+                </ul>
+              </Card>
+              <Card>
+                <h3 className="text-lg font-bold mb-2" style={{ color: colors.text.primary }}>私有部署版</h3>
+                <p className="text-sm leading-relaxed mb-4" style={{ color: colors.text.secondary }}>
+                  数据本地化，完全自主可控。适合有合规要求的企业。
+                </p>
+                <ul className="space-y-2 text-sm" style={{ color: colors.text.muted }}>
+                  <li>• 本地服务器部署</li>
+                  <li>• 数据完全自主</li>
+                  <li>• 深度定制集成</li>
+                </ul>
+              </Card>
             </div>
-            <span className="text-sm font-medium">VertaX</span>
-            <span className="text-xs text-gray-600 ml-2">© {new Date().getFullYear()} VERTAX LIMITED</span>
           </div>
-          <div className="flex items-center gap-6 text-xs text-gray-500">
-            <span>contact@vertax.top</span>
-            <a href="https://tower.vertax.top" className="hover:text-gray-300 transition-colors">管理后台</a>
+        </section>
+
+        {/* CTA Section */}
+        <section
+          className="py-20 sm:py-24 px-4 sm:px-6"
+          style={{ background: colors.bg.darkGradient }}
+        >
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+              准备好开始了吗？
+            </h2>
+            <p className="text-gray-400 mb-8">
+              预约演示，了解 VertaX 如何帮助您的企业实现海外增长。
+              <br />
+              <span className="text-sm text-gray-500">
+                我们会为您准备行业 GTM 路径样板与 ICP 示例。
+              </span>
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <GoldButton href="/contact" size="large" icon={<ArrowRight className="w-4 h-4" />}>
+                预约演示
+              </GoldButton>
+              <OutlineButton href="/features">
+                了解功能
+              </OutlineButton>
+            </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </section>
+
+        <MarketingFooter />
+      </div>
     </>
   );
 }
