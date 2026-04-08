@@ -14,23 +14,27 @@ export default function CustomerLayout({
   const tenantSlug = session?.user?.tenantSlug;
 
   return (
-    <div className="customer-theme flex min-h-screen bg-[#F7F3EA] text-[#111827]">
-      <CustomerSidebar tenantName={tenantName} tenantSlug={tenantSlug} />
-      <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <CustomerHeader
-          tenantName={tenantName}
-          tenantSlug={tenantSlug}
-        />
-        <section className="flex-1 overflow-y-auto bg-[#F7F3EA] scrollbar-hide">
-          <div className="flex h-full">
-            <div className="flex-1 overflow-y-auto p-4 lg:p-5 scrollbar-hide">
-              <div className="max-w-[1720px] mx-auto">
-                {children}
+    <>
+      {/* 租户后台禁止搜索引擎收录 */}
+      <meta name="robots" content="noindex, nofollow" />
+      <div className="customer-theme flex min-h-screen bg-[#F7F3EA] text-[#111827]">
+        <CustomerSidebar tenantName={tenantName} tenantSlug={tenantSlug} />
+        <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+          <CustomerHeader
+            tenantName={tenantName}
+            tenantSlug={tenantSlug}
+          />
+          <section className="flex-1 overflow-y-auto bg-[#F7F3EA] scrollbar-hide">
+            <div className="flex h-full">
+              <div className="flex-1 overflow-y-auto p-4 lg:p-5 scrollbar-hide">
+                <div className="max-w-[1720px] mx-auto">
+                  {children}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-      </main>
-    </div>
+          </section>
+        </main>
+      </div>
+    </>
   );
 }
