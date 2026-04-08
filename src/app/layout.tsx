@@ -68,11 +68,6 @@ export const metadata: Metadata = {
     'GTM 系统',
   ].join(', '),
 
-  // 百度站点验证
-  verification: {
-    baidu: 'codeva-Y0nSSpkmX1',
-  },
-
   // 作者信息
   authors: [
     {
