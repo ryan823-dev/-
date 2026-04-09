@@ -65,6 +65,37 @@ export const MARKETING_PAGES: SitemapPage[] = [
     changeFrequency: 'monthly',
   },
   {
+    path: '/about/what-is-overseas-acquisition-agent',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/about/vertax-vs-traditional-tools',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  // GEO 新增页面（P0 问题覆盖）
+  {
+    path: '/about/private-deployment',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/about/start-overseas-from-zero',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/about/implementation-guide',
+    priority: 0.7,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/about/b2b-overseas-marketing',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
     path: '/faq',
     priority: 0.8,
     changeFrequency: 'monthly',

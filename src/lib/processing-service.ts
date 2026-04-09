@@ -48,14 +48,6 @@ const IMAGE_TYPES = new Set([
 ]);
 
 // 文档 MIME 类型（微服务处理）
-const LARGE_DOCUMENT_TYPES = new Set([
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-]);
-
 /**
  * 决定使用哪个处理器
  */

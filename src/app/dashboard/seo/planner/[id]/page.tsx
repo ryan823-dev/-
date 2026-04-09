@@ -62,6 +62,7 @@ export default function AuditReportPage() {
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const auditStatus = audit?.status;
 
   const loadFull = useCallback(async () => {
     try {
@@ -94,9 +95,9 @@ export default function AuditReportPage() {
   // Polling for in-progress audits
   useEffect(() => {
     if (
-      !audit ||
-      audit.status === "completed" ||
-      audit.status === "failed"
+      !auditStatus ||
+      auditStatus === "completed" ||
+      auditStatus === "failed"
     ) {
       return;
     }
@@ -128,7 +129,7 @@ export default function AuditReportPage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [audit?.status, auditId, loadFull]);
+  }, [auditStatus, auditId, loadFull]);
 
   async function handleRetry() {
     if (!audit) return;

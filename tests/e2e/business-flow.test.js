@@ -79,7 +79,7 @@ function warn(msg) { results.warnings.push(msg); log('⚠️', msg); }
       const afterLoginUrl = page.url();
       pass(`登录成功 - 跳转到: ${new URL(afterLoginUrl).pathname}`);
       await page.screenshot({ path: 'tests/screenshots/biz-02-after-login.png' });
-    } catch (e) {
+    } catch {
       // 检查是否有错误提示
       const errorText = await page.locator('[role="alert"], .text-red, .text-destructive, .error').first().textContent().catch(() => null);
       if (errorText) {

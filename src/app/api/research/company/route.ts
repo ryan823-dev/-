@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
           ...(typeof candidate.rawData === 'object' && candidate.rawData !== null ? candidate.rawData : {}),
           companyResearch: JSON.parse(JSON.stringify(result.data)),
           researchAt: new Date().toISOString(),
-        } as any,
+        } as Prisma.InputJsonValue,
       },
     });
 

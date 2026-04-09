@@ -75,20 +75,26 @@ export function AssetDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState<UpdateAssetInput>({});
   const [newTag, setNewTag] = useState("");
+  const assetId = asset?.id;
+  const assetTitle = asset?.title;
+  const assetDescription = asset?.description || "";
+  const assetTags = asset?.tags;
+  const assetPurpose = asset?.purpose as AssetPurpose[] | undefined;
+  const assetFolderId = asset?.folderId;
 
   // 当 asset 变化时重置编辑状态
   useEffect(() => {
-    if (asset) {
-      setEditData({
-        title: asset.title,
-        description: asset.description || "",
-        tags: asset.tags || [],
-        purpose: asset.purpose as AssetPurpose[],
-        folderId: asset.folderId,
-      });
-      setIsEditing(false);
-    }
-  }, [asset?.id]);
+    if (!assetId) return;
+
+    setEditData({
+      title: assetTitle,
+      description: assetDescription,
+      tags: assetTags || [],
+      purpose: assetPurpose,
+      folderId: assetFolderId,
+    });
+    setIsEditing(false);
+  }, [assetDescription, assetFolderId, assetId, assetPurpose, assetTags, assetTitle]);
 
   if (!asset) return null;
 

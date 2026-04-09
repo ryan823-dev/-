@@ -46,7 +46,7 @@ const CRED = { email: 'admin@tdpaint.com', password: 'Tdpaint2026!' };
     try {
       await page.waitForURL(u => !u.pathname.includes('/login'), { timeout: 20000 });
       console.log(' OK  Login success -> ' + new URL(page.url()).pathname);
-    } catch (e) {
+    } catch {
       console.log('FAIL Login did not redirect');
     }
     if (fails.length > 0) {

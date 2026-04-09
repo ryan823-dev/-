@@ -26,7 +26,7 @@ export function ArticleSchema({
   datePublished,
   dateModified,
   author = { name: "VertaX 团队", url: "https://vertax.top/about" },
-  image = "https://vertax.top/icon.svg",
+  image = "https://vertax.top/logo.svg",
   articleBody,
   keywords
 }: ArticleSchemaProps) {
@@ -53,7 +53,7 @@ export function ArticleSchema({
       "url": "https://vertax.top",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://vertax.top/icon.svg"
+        "url": "https://vertax.top/logo.svg"
       }
     },
     "image": image,

@@ -557,7 +557,9 @@ function extractIndustries(content: string): string[] {
 
 // ==================== 导出 ====================
 
-export default {
+const webScraperService = {
   fetchWebContent,
   scrapeCompanyInfo,
 };
+
+export default webScraperService;

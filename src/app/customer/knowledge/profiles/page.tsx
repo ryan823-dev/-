@@ -95,7 +95,9 @@ export default function ProfilesPage() {
     try {
       const data = await getICPSegments();
       setSegments(data);
-      if (data.length > 0 && !selectedSegmentId) setSelectedSegmentId(data[0].id);
+      if (data.length > 0) {
+        setSelectedSegmentId((current) => current ?? data[0].id);
+      }
     } catch {
       setToast({ message: '加载细分市场失败', type: 'error' });
     } finally { setIsLoading(false); }

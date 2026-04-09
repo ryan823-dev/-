@@ -272,7 +272,9 @@ function getIndustryPainPoints(industry: string): string[] {
 
 // ==================== 导出 ====================
 
-export default {
+const customerProfileService = {
   getCustomerProfile,
   generatePersonalizedContent,
 };
+
+export default customerProfileService;

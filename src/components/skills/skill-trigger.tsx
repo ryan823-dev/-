@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { executeSkill } from '@/actions/skills';
 import type { SkillRequest, SkillResponse } from '@/lib/skills/types';
+import type { EntityType } from '@/types/artifact';
 
 // ==================== Types ====================
 
@@ -19,7 +20,7 @@ interface SkillTriggerProps {
   skillName: string;
   displayName: string;
   description?: string;
-  entityType: string;
+  entityType: EntityType;
   entityId: string;
   input: Record<string, unknown>;
   evidenceIds?: string[];
@@ -61,7 +62,7 @@ export function SkillTrigger({
 
     try {
       const request: SkillRequest = {
-        entityType: entityType as any,
+        entityType,
         entityId,
         input,
         mode: 'generate',

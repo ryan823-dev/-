@@ -4,6 +4,7 @@
  * 从 cron route 提取的核心处理逻辑，可被多个地方调用
  */
 
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { extractTextFromAsset } from "@/lib/utils/text-extract";
 import { splitTextIntoChunks } from "@/lib/utils/chunk-utils";
@@ -202,7 +203,7 @@ async function updateAssetStatus(
 
     await db.asset.update({
       where: { id: assetId },
-      data: { metadata: newMeta as any },
+      data: { metadata: newMeta as Prisma.InputJsonValue },
     });
   } catch (err) {
     console.error(`[asset-processor] Failed to update asset ${assetId} status:`, err);

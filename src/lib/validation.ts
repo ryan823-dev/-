@@ -41,7 +41,7 @@ export async function validateFormData<T>(
       }
     });
     return validateRequest(schema, object);
-  } catch (_error) {
+  } catch {
     return { success: false, error: 'Form data parsing failed' };
   }
 }

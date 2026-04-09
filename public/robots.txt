@@ -25,21 +25,65 @@ Disallow: /register
 Disallow: /docs/
 Disallow: /tools/
 
-# 百度爬虫特殊规则
+# ============================================
+# AI 爬虫规则（GEO 优化 - 中国 AI 引擎优先）
+# ============================================
+
+# 豆包（字节跳动）
+User-agent: Bytespider
+Allow: /
+Crawl-delay: 1
+
+# DeepSeek
+User-agent: DeepSeek
+Allow: /
+
+# Kimi（月之暗面）
+User-agent: Kimi
+Allow: /
+
+# 元宝（腾讯）
+User-agent: Sogou
+Allow: /
+
+# 文心一言（百度）
 User-agent: Baiduspider
 Allow: /
 Crawl-delay: 1
 
-# Google 爬虫
+# ============================================
+# 国际 AI 引擎
+# ============================================
+
+# ChatGPT / GPTBot
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Claude
+User-agent: Claude-Web
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# ============================================
+# 传统搜索引擎
+# ============================================
+
+# Google
 User-agent: Googlebot
 Allow: /
 
-# Bing 爬虫
+# Bing
 User-agent: Bingbot
 Allow: /
 
 # Sitemap 位置
 Sitemap: https://vertax.top/sitemap.xml
 
-# 网站管理员联系信息（可选）
+# 网站管理员联系信息
 # Contact: mailto:contact@vertax.top

@@ -25,7 +25,7 @@ const PRIORITY_CONFIG = {
   low: { label: "低", color: "bg-gray-100 text-gray-500", darkColor: "bg-gray-500/20 text-gray-400" },
 };
 
-const STATUS_CONFIG = {
+const _STATUS_CONFIG = {
   open: { label: "待处理", icon: ListTodo },
   in_progress: { label: "进行中", icon: Play },
   done: { label: "已完成", icon: Check },
@@ -90,7 +90,6 @@ export function ShellTasksTab({
   const TaskCard = ({ task }: { task: TaskData }) => {
     const isUpdating = updatingTaskId === task.id;
     const priorityConfig = PRIORITY_CONFIG[task.priority];
-    const statusConfig = STATUS_CONFIG[task.status];
 
     return (
       <div className={`rounded-xl border p-3 ${cardStyles}`}>

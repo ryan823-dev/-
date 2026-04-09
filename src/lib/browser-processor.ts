@@ -126,7 +126,7 @@ async function processPdf(
     const textContent = await page.getTextContent();
 
     const pageText = textContent.items
-      .map((item: any) => item.str)
+      .map((item) => ("str" in item ? item.str : ""))
       .join(' ');
 
     text += pageText + '\n\n';

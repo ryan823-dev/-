@@ -399,8 +399,10 @@ function sleep(ms: number): Promise<void> {
 
 // ==================== 导出 ====================
 
-export default {
+const dataValidator = {
   validateCandidate,
   crossValidateWithSource,
   validateCandidates,
 };
+
+export default dataValidator;

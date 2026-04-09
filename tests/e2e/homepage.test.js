@@ -130,7 +130,7 @@ const CONFIG = {
           await links[i].scrollIntoViewIfNeeded();
           await links[i].hover();
           clickableLinks.push(href);
-        } catch (error) {
+        } catch {
           console.log(`⚠️  链接 ${href} 不可点击`);
         }
       }

@@ -11,7 +11,7 @@ export function OrganizationSchema() {
     "name": "VertaX",
     "alternateName": "VERTAX LIMITED",
     "url": "https://vertax.top",
-    "logo": "https://vertax.top/icon.svg",
+    "logo": "https://vertax.top/logo.svg",
     "description": "VertaX 是面向中国企业出海的智能获客平台，围绕知识引擎、内容增长、商机挖掘、品牌声量、协同推进与经营决策六大能力，帮助企业建立可持续、可进化的全球增长体系。",
     "foundingDate": "2024",
     "industry": "B2B SaaS, 出海服务, 智能营销",

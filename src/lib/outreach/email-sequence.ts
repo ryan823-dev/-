@@ -298,9 +298,11 @@ function generateDefaultEmail(name: string): string {
   `;
 }
 
-export default {
+const emailSequenceService = {
   batchSendToCandidates,
   sendWithSequence,
   sendFollowUp,
   processScheduledEmails,
 };
+
+export default emailSequenceService;
