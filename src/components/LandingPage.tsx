@@ -260,11 +260,11 @@ export default function LandingPage() {
         style={{ background: 'linear-gradient(180deg, #F7F3EA 0%, #FFFFFF 100%)' }}
       >
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3" style={{ color: colors.text.primary }}>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3" style={{ color: '#0B1B2B' }}>
             方法论与系统缺位，才是出海获客的瓶颈。
           </h2>
-          <p className="text-base sm:text-lg" style={{ color: colors.text.secondary }}>
-            VertaX 提供工业出海获客操作系统，让获客从靠人变成靠系统。
+          <p className="text-base sm:text-lg" style={{ color: '#334155' }}>
+            VertaX 提供从0到1的出海辅导，让获客从靠人变成靠系统。
           </p>
         </div>
       </section>
