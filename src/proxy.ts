@@ -7,7 +7,7 @@ import { resolveTenant } from "@/lib/tenant-resolver";
 const { auth } = NextAuth(authConfig);
 
 const publicPaths = ["/login", "/register", "/api/auth", "/api/inquiry"];
-const CRON_ROUTES = ["/api/cron/", "/api/radar/sync"];
+const CRON_ROUTES = ["/api/cron/"];
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "vertax.top";
 
