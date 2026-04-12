@@ -437,49 +437,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Core Value ── */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6" style={{ background: colors.bg.primary }}>
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <span
-              className="text-xs font-bold uppercase tracking-widest mb-3 inline-block"
-              style={{ color: colors.brand.primary }}
-            >
-              核心价值
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: colors.text.primary }}>
-              VertaX 的价值主张
-            </h2>
-            <p className="text-sm" style={{ color: colors.text.muted }}>
-              不是工具集合，是工业出海获客的操作系统
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: Brain, title: '资产化', desc: '每一次获客动作都沉淀为可复用的组织资产，不因人员流动归零。', color: colors.brand.primary },
-              { icon: Shield, title: '标准化', desc: '从 ICP 定义到跟进节奏，全流程有标准、可度量。', color: colors.brand.secondary },
-              { icon: BarChart3, title: '可审计', desc: '动作记录、效果归因、成本核算，全链路透明可追溯。', color: colors.brand.accent }
-            ].map(({ icon: Icon, title, desc, color }) => (
-              <div
-                key={title}
-                className="rounded-2xl p-6"
-                style={{
-                  background: colors.bg.secondary,
-                  border: `1px solid ${colors.border.light}`,
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                }}
-              >
-                <Icon className="w-8 h-8 mb-4" style={{ color }} />
-                <h3 className="text-lg font-bold mb-2" style={{ color }}>{title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: colors.text.secondary }}>{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Six Modules ── */}
+      {/* ── Core Value / Three Pillars ── */}
       <section
         className="py-16 sm:py-20 px-4 sm:px-6"
         style={{
@@ -487,43 +445,85 @@ export default function LandingPage() {
         }}
       >
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
             <span
               className="text-xs font-bold uppercase tracking-widest mb-3 inline-block"
               style={{ color: colors.brand.primary }}
             >
-              六大模块
+              核心价值
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-              VertaX 六大核心模块
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+              把一家想出海的企业，变成一家能出海的企业
             </h2>
-            <p className="text-sm text-gray-500">
-              从知识沉淀到商机推进，构建完整的出海增长闭环
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { icon: Brain, title: '知识引擎', desc: '产品、资质、竞品、行业知识结构化沉淀，让 AI 真正理解你的业务。' },
-              { icon: TrendingUp, title: '增长系统', desc: '多语言 SEO 内容持续生产，吸引高意向海外客户自然询盘。' },
-              { icon: Radar, title: '获客雷达', desc: '围绕 ICP 识别潜在线索，分层判断优先级，高效发现目标客户。' },
-              { icon: Megaphone, title: '声量枢纽', desc: '社媒矩阵运营与 PR 协同，提升品牌在目标市场的声量与可信度。' },
-              { icon: Send, title: '推进中台', desc: '从建联到跟进的协同推进系统，跨部门协作可视化、节奏可控。' },
-              { icon: BarChart3, title: '决策中心', desc: '一屏看清投入、节奏、结果，支持周报月报自动生成。' }
-            ].map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="rounded-xl p-5 transition-colors"
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}
-              >
-                <Icon className="w-7 h-7 mb-3" style={{ color: colors.brand.primary }} />
-                <h3 className="font-bold text-white mb-2">{title}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
+          {/* Pillar 1: 专业化表达 */}
+          <div className="mb-12">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white">专业化表达</h3>
+              <p className="text-sm mt-1" style={{ color: colors.brand.primary }}>让专业，被客户一眼看见</p>
+              <p className="text-sm mt-2" style={{ color: colors.text.muted }}>
+                把企业、产品与服务能力，转化为清晰、专业、可信的海外表达。
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Brain className="w-7 h-7 mb-3" style={{ color: colors.brand.primary }} />
+                <h4 className="font-bold text-white mb-2">知识引擎</h4>
+                <p className="text-sm text-gray-400">沉淀企业、产品、资质、行业认知，形成统一表达基础。</p>
               </div>
-            ))}
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Megaphone className="w-7 h-7 mb-3" style={{ color: colors.brand.primary }} />
+                <h4 className="font-bold text-white mb-2">声量枢纽</h4>
+                <p className="text-sm text-gray-400">把专业内容持续输出到目标市场，建立品牌声量与信任感。</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pillar 2: 体系化启动 */}
+          <div className="mb-12">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white">体系化启动</h3>
+              <p className="text-sm mt-1" style={{ color: colors.brand.secondary }}>让出海营销与获客真正启动</p>
+              <p className="text-sm mt-2" style={{ color: colors.text.muted }}>
+                围绕内容、渠道与客户触达，推动出海动作从想法走向执行。
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <TrendingUp className="w-7 h-7 mb-3" style={{ color: colors.brand.secondary }} />
+                <h4 className="font-bold text-white mb-2">增长系统</h4>
+                <p className="text-sm text-gray-400">持续做多语言内容与 SEO 布局，形成长期获客入口。</p>
+              </div>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Radar className="w-7 h-7 mb-3" style={{ color: colors.brand.secondary }} />
+                <h4 className="font-bold text-white mb-2">获客雷达</h4>
+                <p className="text-sm text-gray-400">识别目标客户，发现线索并推动主动触达。</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pillar 3: 组织化沉淀 */}
+          <div>
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white">组织化沉淀</h3>
+              <p className="text-sm mt-1" style={{ color: colors.brand.accent }}>让每一次动作都成为能力</p>
+              <p className="text-sm mt-2" style={{ color: colors.text.muted }}>
+                把资料、反馈、协同与结果沉淀为可复用的组织资产。
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Send className="w-7 h-7 mb-3" style={{ color: colors.brand.accent }} />
+                <h4 className="font-bold text-white mb-2">推进中台</h4>
+                <p className="text-sm text-gray-400">承接企业与系统之间的协同互动，对内容进行校正和补充，推动产出真正符合行业与企业实际。</p>
+              </div>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <BarChart3 className="w-7 h-7 mb-3" style={{ color: colors.brand.accent }} />
+                <h4 className="font-bold text-white mb-2">决策中心</h4>
+                <p className="text-sm text-gray-400">统一呈现投入、节奏、产出与结果，让每一步都更清晰、更可判断。</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
